@@ -80,6 +80,12 @@ class ExecutionLifecycleTest {
         var report=run(Successful.class);assertEquals(0,report.exitCode());assertEquals(3,report.counts().get("PASSED"));
         assertEquals(List.of("before-all","setup","teardown","closed","child","teardown","closed","second-child","teardown","closed","after-all"),trace);
     }
+    @Test void explicitAndAutomaticCleanupCloseEachSessionOnlyOnce() throws Exception {
+        var engine=new Engine();var info=new CaseInfo("TST_CLOSE","Cleanup",Persona.DEFAULT,List.of(),List.of(),getClass().getName());
+        var context=new SfTestContext(config(),"cleanup-run",info,root,engine);
+        context.close();context.close();
+        assertEquals(List.of("closed"),trace);assertTrue(engine.closed);
+    }
     @ExtendWith(SfE2eExtension.class)
     static class TeardownFailure {
         @AfterEach void teardown(SfTestContext sf) { assertFalse(((Engine)sf.engine()).closed);trace.add("failing-teardown");throw new AssertionError("Teardown failure"); }

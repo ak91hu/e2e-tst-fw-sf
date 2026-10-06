@@ -28,21 +28,21 @@ class BatchLearningHarnessIT {
             });
             server.createContext("/model",e -> {
                 byte[] wire=e.getRequestBody().readAllBytes();calls++;bytes+=wire.length;wireSizes.add(wire.length);var body=Json.MAPPER.readTree(wire);caps.add(body.path("max_completion_tokens").asInt());
-                var request=Json.MAPPER.readTree(body.path("messages").get(1).path("content").asText());
+                var request=Json.MAPPER.readTree(body.path("messages").get(1).path("content").asString());
                 assertFalse(Json.string(request).contains("PRIVATE_INPUT_SENTINEL"));Object data;
-                if(request.path("kind").asText().equals("case-target-batch")) {
+                if(request.path("kind").asString().equals("case-target-batch")) {
                     List<Map<String,Object>> selected=new ArrayList<>();
-                    for(var target:request.path("params").path("targets")) selected.add(Map.of("id",target.path("id").asText(),"nodeId",invalid?"invented":node(request,target.path("instruction").asText())));
+                    for(var target:request.path("params").path("targets")) selected.add(Map.of("id",target.path("id").asString(),"nodeId",invalid?"invented":node(request,target.path("instruction").asString())));
                     data=Map.of("targets",selected);
-                } else data=Map.of("nodeId",node(request,request.path("params").path("target").asText()));
+                } else data=Map.of("nodeId",node(request,request.path("params").path("target").asString()));
                 var response=new ModelClient.Response("finish",null,null,null,"PASSED","Observed fixture targets",null,List.of(),Json.MAPPER.valueToTree(data),null);
                 long input=(wire.length+3)/4;long output=32;
                 send(e,"application/json",Json.string(Map.of("choices",List.of(Map.of("finish_reason","stop","message",Map.of("content",Json.string(response)))),"usage",Map.of("total_tokens",input+output,"prompt_tokens",input,"completion_tokens",output))));
             });server.start();
         }
         String origin() {return "http://127.0.0.1:"+server.getAddress().getPort();}
-        String node(com.fasterxml.jackson.databind.JsonNode request,String name) {
-            for(var node:request.path("observation").path("nodes")) if(node.path("attributes").path("testId").asText().equals(name.toLowerCase(Locale.ROOT))) return node.path("id").asText();
+        String node(tools.jackson.databind.JsonNode request,String name) {
+            for(var node:request.path("observation").path("nodes")) if(node.path("attributes").path("testId").asString().equals(name.toLowerCase(Locale.ROOT))) return node.path("id").asString();
             throw new AssertionError("Requested fixture target is absent");
         }
         static void send(com.sun.net.httpserver.HttpExchange e,String type,String text) throws java.io.IOException {

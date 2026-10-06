@@ -1,6 +1,6 @@
 package hu.ak91.sf.e2e.salesforce.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import hu.ak91.sf.e2e.core.*;
 import java.net.*;
 import java.net.http.*;
@@ -36,7 +36,7 @@ public final class SalesforceApi {
     public JsonNode describe(String object,Deadline deadline) { return request("GET",prefix+"sobjects/"+apiName(object)+"/describe/",null,deadline); }
     public Map<String,String> schemaFingerprints(List<String> objects,Deadline deadline) {
         Failure.require(objects!=null && !objects.isEmpty() && objects.size()<=200 && objects.stream().distinct().count()==objects.size(),"API_CONTRACT_INVALID","Declare unique objects for schema regression");Map<String,String> result=new TreeMap<>();
-        for(String object:objects) {JsonNode metadata=describe(object,deadline);Failure.require(metadata.path("fields").isArray(),"API_CONTRACT_INVALID","Object describe omitted field metadata");Map<String,JsonNode> fields=new TreeMap<>();for(var field:metadata.path("fields")) {var selected=Json.MAPPER.createObjectNode();for(String key:List.of("name","type","length","precision","scale","nillable","createable","updateable","referenceTo","restrictedPicklist","picklistValues","defaultedOnCreate")) if(field.has(key)) selected.set(key,field.get(key));Failure.require(fields.put(apiName(field.path("name").asText()),selected)==null,"API_CONTRACT_INVALID","Duplicate metadata field");}result.put(object,Json.hash(fields));}return Map.copyOf(result);
+        for(String object:objects) {JsonNode metadata=describe(object,deadline);Failure.require(metadata.path("fields").isArray(),"API_CONTRACT_INVALID","Object describe omitted field metadata");Map<String,JsonNode> fields=new TreeMap<>();for(var field:metadata.path("fields")) {var selected=Json.MAPPER.createObjectNode();for(String key:List.of("name","type","length","precision","scale","nillable","createable","updateable","referenceTo","restrictedPicklist","picklistValues","defaultedOnCreate")) if(field.has(key)) selected.set(key,field.get(key));Failure.require(fields.put(apiName(field.path("name").asString()),selected)==null,"API_CONTRACT_INVALID","Duplicate metadata field");}result.put(object,Json.hash(fields));}return Map.copyOf(result);
     }
     public void expectSchema(Map<String,String> reviewed,Deadline deadline) {
         Failure.require(reviewed!=null && !reviewed.isEmpty(),"CONFIG_INVALID","Supply reviewed schema fingerprints");Failure.require(schemaFingerprints(new ArrayList<>(reviewed.keySet()),deadline).equals(reviewed),"API_ASSERTION_FAILED","Reviewed object schema/permission metadata drifted");
@@ -48,7 +48,7 @@ public final class SalesforceApi {
         Failure.require(fields!=null && !fields.isEmpty() && fields.size()<=200 && fields.stream().distinct().count()==fields.size(),"API_CONTRACT_INVALID","Explicit unique fields are required");
         var requested=new LinkedHashSet<String>();requested.add("Id");fields.stream().map(SalesforceApi::apiName).forEach(requested::add);String names=String.join(",",requested);
         JsonNode result=request("GET",prefix+"sobjects/"+apiName(object)+"/"+id(id)+"?fields="+names,null,deadline);
-        Failure.require(result.isObject() && result.path("Id").asText().equals(id) && fields.stream().allMatch(result::has),"API_CONTRACT_INVALID","Record response omitted requested identity or fields");return result.deepCopy();
+        Failure.require(result.isObject() && result.path("Id").asString().equals(id) && fields.stream().allMatch(result::has),"API_CONTRACT_INVALID","Record response omitted requested identity or fields");return result.deepCopy();
     }
     public List<JsonNode> query(String soql,Deadline deadline) {
         Failure.require(soql!=null && soql.length()<=20000 && soql.stripLeading().toUpperCase(Locale.ROOT).startsWith("SELECT "),"API_CONTRACT_INVALID","An explicit read-only SOQL SELECT is required");
@@ -58,7 +58,7 @@ public final class SalesforceApi {
             Failure.require(data.isObject() && data.path("records").isArray() && data.path("done").isBoolean(),"API_CONTRACT_INVALID","Invalid query page");
             for(JsonNode row:data.path("records")) { Failure.require(row.isObject() && records.size()<policy.maxRecords(),"API_LIMIT","Query record limit exceeded");records.add(row.deepCopy()); }
             if(data.path("done").asBoolean()) return List.copyOf(records);
-            next=data.path("nextRecordsUrl").asText();Failure.require(next.startsWith(prefix+"query/") && !next.contains("?") && next.matches("/services/data/v[0-9]+\\.0/query/[A-Za-z0-9-]+"),"API_CONTRACT_INVALID","Unsafe pagination destination");
+            next=data.path("nextRecordsUrl").asString();Failure.require(next.startsWith(prefix+"query/") && !next.contains("?") && next.matches("/services/data/v[0-9]+\\.0/query/[A-Za-z0-9-]+"),"API_CONTRACT_INVALID","Unsafe pagination destination");
         }
         throw new Failure("API_LIMIT","Query page limit exceeded");
     }

@@ -1,7 +1,7 @@
 package hu.ak91.sf.e2e.reporting;
 
 import hu.ak91.sf.e2e.core.*;
-import com.fasterxml.jackson.core.type.TypeReference;
+import tools.jackson.core.type.TypeReference;
 import java.nio.file.*;
 import java.util.*;
 

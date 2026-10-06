@@ -15,7 +15,7 @@ class AiRequestEfficiencyTest {
         var messages=(List<?>)compact.get("messages");var data=Json.MAPPER.readTree(((Map<?,?>)messages.get(1)).get("content").toString());
         assertEquals(request.schema(),data.get("schema"));assertEquals(Json.MAPPER.valueToTree(request.params()),data.get("params"));
         var node=data.path("observation").path("nodes").get(0);
-        assertEquals("n1",node.path("id").asText());assertEquals("Reference",node.path("target").path("name").asText());
+        assertEquals("n1",node.path("id").asString());assertEquals("Reference",node.path("target").path("name").asString());
         assertEquals(Json.MAPPER.valueToTree(request.observation().nodes().getFirst().attributes()),node.get("attributes"));
         assertTrue(node.has("disabled"));assertTrue(node.has("checked"));assertFalse(data.path("observation").has("capturedAt"));
         var live=new ModelClient.Request("assert","Check expected value",Map.of("expected","SUPPLIED"),request.observation(),List.of(Map.of("verified",true)),null);

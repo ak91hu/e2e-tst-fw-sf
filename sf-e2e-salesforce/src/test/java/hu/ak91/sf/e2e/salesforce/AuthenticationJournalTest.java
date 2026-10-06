@@ -28,7 +28,7 @@ class AuthenticationJournalTest {
         assertTrue(signature.verify(Base64.getUrlDecoder().decode(parts[2])));
         var claims=Json.MAPPER.readTree(Base64.getUrlDecoder().decode(parts[1]));
         assertEquals(clock.instant().getEpochSecond()+120,claims.get("exp").asLong());
-        assertEquals("business@example.com",claims.get("sub").asText());assertEquals("https://login.salesforce.com",claims.get("aud").asText());
+        assertEquals("business@example.com",claims.get("sub").asString());assertEquals("https://login.salesforce.com",claims.get("aud").asString());
     }
     @Test void acceptsPkcs8AndRejectsWeakOrMalformedKeys() throws Exception {
         var generator=KeyPairGenerator.getInstance("RSA");generator.initialize(2048);

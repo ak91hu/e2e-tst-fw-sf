@@ -1,6 +1,6 @@
 package hu.ak91.sf.e2e.salesforce.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import hu.ak91.sf.e2e.core.*;
 import hu.ak91.sf.e2e.salesforce.fixture.*;
 import java.util.*;
@@ -33,31 +33,31 @@ public final class OwnedFixtures {
         Failure.require(name.startsWith("E2E-TA-") && name.length()>=20,"FIXTURE_INVALID","Use a unique attempt/worker fixture name");
         if(parent!=null) { registry.owned(parent);SalesforceApi.apiName(parentField);Failure.require(!values.containsKey(parentField),"FIXTURE_INVALID","Parent identity is supplied by the ownership journal");values.put(parentField,parent.id()); }
         JsonNode metadata=api.describe(object,deadline);Failure.require(metadata.path("createable").asBoolean() && metadata.path("fields").isArray(),"API_PERMISSION_DENIED","Object create metadata is unavailable");
-        Map<String,JsonNode> fields=new HashMap<>();metadata.path("fields").forEach(f -> fields.put(f.path("name").asText(),f));
-        if(parent!=null) {var field=fields.get(parentField);boolean compatible=false;if(field!=null) for(var type:field.path("referenceTo")) if(type.asText().equals(parent.objectType)) compatible=true;Failure.require(compatible,"FIXTURE_INVALID","Parent relationship does not reference its owned object type");}
+        Map<String,JsonNode> fields=new HashMap<>();metadata.path("fields").forEach(f -> fields.put(f.path("name").asString(),f));
+        if(parent!=null) {var field=fields.get(parentField);boolean compatible=false;if(field!=null) for(var type:field.path("referenceTo")) if(type.asString().equals(parent.objectType)) compatible=true;Failure.require(compatible,"FIXTURE_INVALID","Parent relationship does not reference its owned object type");}
         for(var entry:values.entrySet()) {
             SalesforceApi.apiName(entry.getKey());JsonNode field=fields.get(entry.getKey());
             Failure.require(field!=null && field.path("createable").asBoolean() && !field.path("calculated").asBoolean(),"FIXTURE_INVALID","Fixture contains an unknown or non-createable field");
-            JsonNode value=Json.MAPPER.valueToTree(entry.getValue());String type=field.path("type").asText();
+            JsonNode value=Json.MAPPER.valueToTree(entry.getValue());String type=field.path("type").asString();
             Failure.require(value.isNull()?field.path("nillable").asBoolean():switch(type) {
                 case "boolean" -> value.isBoolean();
                 case "int","double","currency","percent" -> value.isNumber();
-                case "reference" -> value.isTextual() && value.asText().matches("[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?");
-                case "string","textarea","phone","email","url","picklist","multipicklist","date","datetime","base64","encryptedstring","combobox" -> value.isTextual() && (field.path("length").asInt()==0 || value.asText().length()<=field.path("length").asInt());
+                case "reference" -> value.isString() && value.asString().matches("[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?");
+                case "string","textarea","phone","email","url","picklist","multipicklist","date","datetime","base64","encryptedstring","combobox" -> value.isString() && (field.path("length").asInt()==0 || value.asString().length()<=field.path("length").asInt());
                 default -> false;
             },"FIXTURE_INVALID","Fixture value violates field metadata");
             if(type.equals("picklist") && field.path("restrictedPicklist").asBoolean() && !value.isNull()) {
-                boolean valid=false;for(var option:field.path("picklistValues")) if(option.path("active").asBoolean() && option.path("value").asText().equals(value.asText())) valid=true;
+                boolean valid=false;for(var option:field.path("picklistValues")) if(option.path("active").asBoolean() && option.path("value").asString().equals(value.asString())) valid=true;
                 Failure.require(valid,"FIXTURE_INVALID","Restricted picklist value is unavailable");
             }
         }
-        for(var field:fields.values()) Failure.require(!field.path("createable").asBoolean() || field.path("nillable").asBoolean() || field.path("defaultedOnCreate").asBoolean() || field.path("autoNumber").asBoolean() || values.containsKey(field.path("name").asText()),"FIXTURE_INVALID","Required field is missing");
+        for(var field:fields.values()) Failure.require(!field.path("createable").asBoolean() || field.path("nillable").asBoolean() || field.path("defaultedOnCreate").asBoolean() || field.path("autoNumber").asBoolean() || values.containsKey(field.path("name").asString()),"FIXTURE_INVALID","Required field is missing");
         Failure.require(registry.manifest().records().stream().noneMatch(r -> r.plannedName.equals(name)),"FIXTURE_INVALID","A fixture name cannot be created twice in this attempt; reconcile its journal");
         var record=registry.claim(object,name,parent,persona);registry.prepared(record);registry.saveRequested(record);
         try {
             JsonNode result=api.create(object,Json.MAPPER.valueToTree(values),deadline);
             Failure.require(result.path("success").asBoolean() && result.path("errors").isArray() && result.path("errors").isEmpty(),"ACTION_COMMIT_UNCERTAIN","Create success could not be verified");
-            registry.saved(record,SalesforceApi.id(result.path("id").asText()),"api-create");return record;
+            registry.saved(record,SalesforceApi.id(result.path("id").asString()),"api-create");return record;
         } catch(RuntimeException e) { registry.uncertain(record,e instanceof Failure f?f.code():"ACTION_COMMIT_UNCERTAIN");throw e; }
     }
     /** Reconcile by an exact consumer-owned unique field; duplicates or absence never authorize another write. */
@@ -65,7 +65,7 @@ public final class OwnedFixtures {
         registry.owned(record);SalesforceApi.apiName(field);
         String escaped=record.plannedName.replace("\\","\\\\").replace("'","\\'");
         var rows=api.query("SELECT Id,"+field+" FROM "+SalesforceApi.apiName(record.objectType)+" WHERE "+field+" = '"+escaped+"'",deadline);
-        Failure.require(rows.size()==1 && rows.getFirst().path(field).asText().equals(record.plannedName),"ACTION_COMMIT_UNCERTAIN","Fixture reconciliation requires exactly one matching persisted record");
-        registry.saved(record,rows.getFirst().path("Id").asText(),"api-reconciliation");
+        Failure.require(rows.size()==1 && rows.getFirst().path(field).asString().equals(record.plannedName),"ACTION_COMMIT_UNCERTAIN","Fixture reconciliation requires exactly one matching persisted record");
+        registry.saved(record,rows.getFirst().path("Id").asString(),"api-reconciliation");
     }
 }

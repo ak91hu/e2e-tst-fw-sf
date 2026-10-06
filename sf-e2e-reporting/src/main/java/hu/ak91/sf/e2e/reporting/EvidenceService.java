@@ -49,7 +49,7 @@ public final class EvidenceService implements EvidenceSink {
     @Override public void event(Map<String,Object> event) {
         Map<String,Object> safe;
         try {
-            safe=Json.MAPPER.convertValue(secrets.redactTree(Json.MAPPER.valueToTree(event)),new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){});
+            safe=Json.MAPPER.convertValue(secrets.redactTree(Json.MAPPER.valueToTree(event)),new tools.jackson.core.type.TypeReference<Map<String,Object>>(){});
         } catch(Exception e) { throw new Failure("EVIDENCE_INCOMPLETE","Could not redact event"); }
         Map<String,Object> withTime=new LinkedHashMap<>(safe);withTime.put("capturedAt",Instant.now().toString());events.add(Map.copyOf(withTime));
         try { Files.writeString(attemptRoot.resolve("events.redacted.jsonl"),Json.string(withTime)+"\n",StandardCharsets.UTF_8,StandardOpenOption.CREATE,StandardOpenOption.APPEND); }

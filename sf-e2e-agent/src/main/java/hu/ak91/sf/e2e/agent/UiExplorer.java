@@ -4,7 +4,7 @@ import hu.ak91.sf.e2e.core.*;
 import hu.ak91.sf.e2e.core.locator.*;
 import hu.ak91.sf.e2e.core.page.PageObjects;
 import hu.ak91.sf.e2e.core.scenario.*;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
@@ -70,7 +70,7 @@ public final class UiExplorer {
             JsonSchema.validate(response.data(),ROUTES_SCHEMA);
             Set<String> allowed=new HashSet<>();candidates.forEach(c -> allowed.add((String)c.get("route")));
             for(var value:response.data().path("routes")) {
-                String selected=value.asText();Failure.require(allowed.contains(selected),"MODEL_OUTPUT_INVALID","Discovery invented an unavailable route");
+                String selected=value.asString();Failure.require(allowed.contains(selected),"MODEL_OUTPUT_INVALID","Discovery invented an unavailable route");
                 if(queued.add(selected)) queue.addLast(selected);
             }
         }

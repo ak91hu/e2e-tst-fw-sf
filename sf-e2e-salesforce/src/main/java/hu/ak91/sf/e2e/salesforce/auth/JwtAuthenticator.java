@@ -68,12 +68,12 @@ public final class JwtAuthenticator {
         String user=secrets.resolve(new SecretRef(config.persona(persona).usernameRef(),"persona-username"));
         String jwt=assertion(client,user,config.jwtAudience(),key(),Clock.systemUTC());secrets.register(jwt);
         var token=post(config.tokenOrigin(),"/services/oauth2/token",Map.of("grant_type","urn:ietf:params:oauth:grant-type:jwt-bearer","assertion",jwt),null,deadline);
-        String access=token.path("access_token").asText();
-        Failure.require(!access.isBlank() && token.path("instance_url").asText().equals(config.org().baseUrl()),"AUTH_CREDENTIAL_INVALID","Token response org identity mismatch");
+        String access=token.path("access_token").asString();
+        Failure.require(!access.isBlank() && token.path("instance_url").asString().equals(config.org().baseUrl()),"AUTH_CREDENTIAL_INVALID","Token response org identity mismatch");
         secrets.register(access);
         String start=config.auth().startRoute().substring(1);
         var bridge=post(config.org().baseUrl(),"/services/oauth2/singleaccess",Map.of("redirect_uri",start),access,deadline);
-        String url=bridge.path("frontdoor_uri").asText();
+        String url=bridge.path("frontdoor_uri").asString();
         validateFrontdoor(url,config.org().baseUrl(),start);
         registerFrontdoorSecrets(url,secrets);
         return url;
@@ -84,8 +84,8 @@ public final class JwtAuthenticator {
         preflight(Set.of(persona));
         String jwt=assertion(secrets.resolve(new SecretRef(config.auth().clientIdRef(),"jwt-issuer")),secrets.resolve(new SecretRef(config.persona(persona).usernameRef(),"persona-username")),config.jwtAudience(),key(),Clock.systemUTC());secrets.register(jwt);
         var response=post(config.tokenOrigin(),"/services/oauth2/token",Map.of("grant_type","urn:ietf:params:oauth:grant-type:jwt-bearer","assertion",jwt),null,deadline);
-        String token=response.path("access_token").asText();
-        Failure.require(!token.isBlank() && response.path("instance_url").asText().equals(config.org().baseUrl()),"AUTH_CREDENTIAL_INVALID","REST session org identity mismatch");secrets.register(token);return token;
+        String token=response.path("access_token").asString();
+        Failure.require(!token.isBlank() && response.path("instance_url").asString().equals(config.org().baseUrl()),"AUTH_CREDENTIAL_INVALID","REST session org identity mismatch");secrets.register(token);return token;
     }
     static void registerFrontdoorSecrets(String url,SecretRegistry secrets) {
         URI uri=URI.create(url);
@@ -115,7 +115,7 @@ public final class JwtAuthenticator {
                 query.get("cshc").length()>=6 && query.get("startURL").equals(start),"AUTH_CREDENTIAL_INVALID","Invalid UI Bridge parameters");
         } catch(Failure e) { throw e; } catch(Exception e) { throw new Failure("AUTH_CREDENTIAL_INVALID","Malformed UI Bridge URL"); }
     }
-    private com.fasterxml.jackson.databind.JsonNode post(String origin,String path,Map<String,String> params,String access,Deadline deadline) {
+    private tools.jackson.databind.JsonNode post(String origin,String path,Map<String,String> params,String access,Deadline deadline) {
         String body=params.entrySet().stream().map(e -> URLEncoder.encode(e.getKey(),StandardCharsets.UTF_8)+"="+URLEncoder.encode(e.getValue(),StandardCharsets.UTF_8)).collect(java.util.stream.Collectors.joining("&"));
         try {
             var request=HttpRequest.newBuilder(URI.create(origin+path)).timeout(deadline.child(Duration.ofSeconds(30)).remaining())

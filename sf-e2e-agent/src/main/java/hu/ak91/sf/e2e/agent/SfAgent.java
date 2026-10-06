@@ -2,7 +2,7 @@ package hu.ak91.sf.e2e.agent;
 
 import hu.ak91.sf.e2e.core.*;
 import hu.ak91.sf.e2e.replay.CacheStore;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.nio.file.Path;
 import java.time.*;
 import java.util.*;

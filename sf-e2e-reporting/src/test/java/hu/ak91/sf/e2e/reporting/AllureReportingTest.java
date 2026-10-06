@@ -35,14 +35,31 @@ class AllureReportingTest {
         assertEquals(4,evidence.artifacts().size());
         WorkflowReportExporter.write(root,state("PASSED",evidence.artifacts()),evidence.events());WorkflowReportExporter.verify(root);
         var result=Json.MAPPER.readTree(Files.readString(root.resolve("allure-results/attempt-result.json")));
-        assertEquals("passed",result.path("status").asText());assertEquals(2,result.path("steps").size());
+        assertEquals("passed",result.path("status").asString());assertEquals(2,result.path("steps").size());
         assertTrue(result.path("steps").get(0).path("attachments").size()>0);assertTrue(result.path("steps").get(1).path("attachments").size()>0);
         assertTrue(result.path("steps").get(1).path("steps").toString().contains("locator-healed"));
-        assertEquals(4,result.path("attachments").findValuesAsText("type").stream().filter("image/png"::equals).count());
+        assertEquals(4,result.path("attachments").findValuesAsString("type").stream().filter("image/png"::equals).count());
         assertTrue(Files.size(root.resolve("index.html"))>10000);assertEquals("Allure",Json.read(root.resolve("allure-generation.json"),Map.class).get("engine"));
+        assertTrue(Files.readString(root.resolve("index.html")).contains("Content-Security-Policy"));
+        var generation=Json.read(root.resolve("allure-generation.json"),Map.class);
+        assertEquals(AllureReports.VERSION,generation.get("version"));assertEquals(true,generation.get("singleFile"));
+        assertTrue(generation.get("nodeVersion").toString().matches("v[0-9]+\\.[0-9]+\\.[0-9]+"));
         try(var directories=Files.list(root)) { assertEquals(List.of(older),directories.filter(p -> p.getFileName().toString().startsWith(".allure-render-")).toList()); }
         assertTrue(Files.isRegularFile(older.resolve("diagnostic.txt")));assertTrue(Files.isRegularFile(root.resolve("allure-results/attempt-result.json")));
         Files.writeString(root.resolve("index.html"),"tampered");assertThrows(Failure.class,() -> AllureReports.verify(root));
+    }
+    @Test void missingNodePreservesRawEvidenceAndPreviouslyPublishedHtml() throws Exception {
+        var evidence=evidence();evidence.checkpoint("case-start");evidence.checkpoint("test-completion");
+        WorkflowReportExporter.write(root,state("PASSED",evidence.artifacts()),List.of(),false);
+        Files.writeString(root.resolve("index.html"),"previously published HTML");
+        String previous=System.getProperty("sf.e2e.nodeExecutable");
+        try {
+            System.setProperty("sf.e2e.nodeExecutable",root.resolve("missing-node-executable").toString());
+            assertEquals("REPORT_RUNTIME_UNAVAILABLE",assertThrows(Failure.class,() -> AllureReports.generate(root)).code());
+            assertEquals("previously published HTML",Files.readString(root.resolve("index.html")));
+            WorkflowReportExporter.verifyEvidence(root);
+            assertTrue(Files.isRegularFile(root.resolve("allure-results/attempt-result.json")));
+        } finally { if(previous==null) System.clearProperty("sf.e2e.nodeExecutable");else System.setProperty("sf.e2e.nodeExecutable",previous); }
     }
     @Test void failedStepStaysFailedAndLaterPlannedStepsStaySkippedWithFailureScreenshot() throws Exception {
         var evidence=evidence();evidence.checkpoint("case-start");
@@ -52,9 +69,9 @@ class AllureReportingTest {
         var state=state("FAILED",evidence.artifacts());state.put("code","ASSERTION_FAILED");state.put("diagnostic","Expected outcome was not satisfied");
         WorkflowReportExporter.write(root,state,evidence.events());
         var result=Json.MAPPER.readTree(Files.readString(root.resolve("allure-results/attempt-result.json")));
-        assertEquals("failed",result.path("status").asText());assertEquals("passed",result.path("steps").get(0).path("status").asText());
-        assertEquals("failed",result.path("steps").get(1).path("status").asText());assertEquals("skipped",result.path("steps").get(2).path("status").asText());
-        assertEquals("case-failure",result.path("steps").get(1).path("attachments").get(0).path("name").asText());WorkflowReportExporter.verify(root);
+        assertEquals("failed",result.path("status").asString());assertEquals("passed",result.path("steps").get(0).path("status").asString());
+        assertEquals("failed",result.path("steps").get(1).path("status").asString());assertEquals("skipped",result.path("steps").get(2).path("status").asString());
+        assertEquals("case-failure",result.path("steps").get(1).path("attachments").get(0).path("name").asString());WorkflowReportExporter.verify(root);
     }
     @Test void disabledExtraCapturesKeepMandatoryCheckpointsAndPlainJavaActionsGetSeparateScreenshots() throws Exception {
         var quiet=new EvidenceService(root,"run","quiet",() -> {try {return new ReportIntegrityTest.Engine();} catch(Exception e) {throw new RuntimeException(e);}},Deadline.after(Duration.ofSeconds(5)),new SecretRegistry(),false);
@@ -66,13 +83,19 @@ class AllureReportingTest {
         var state=state("FAILED",List.of());state.put("code","AUTH_CREDENTIAL_UNAVAILABLE");state.put("diagnostic","Missing configured credential reference");
         WorkflowReportExporter.write(root,state,List.of());
         var result=Json.MAPPER.readTree(Files.readString(root.resolve("allure-results/attempt-result.json")));
-        assertEquals("broken",result.path("status").asText());assertEquals(0,result.path("attachments").findValuesAsText("type").stream().filter("image/png"::equals).count());
+        assertEquals("broken",result.path("status").asString());assertEquals(0,result.path("attachments").findValuesAsString("type").stream().filter("image/png"::equals).count());
         WorkflowReportExporter.verify(root);
     }
     @Test void unsafeArchivePathsCannotEscapeTheAllureInstallationDirectory() throws Exception {
         var output=new ByteArrayOutputStream();try(var zip=new ZipOutputStream(output)) {zip.putNextEntry(new ZipEntry("../escaped.txt"));zip.write(new byte[]{1});zip.closeEntry();}
         assertEquals("REPORT_GENERATION_FAILED",assertThrows(Failure.class,() -> AllureReports.extract(output.toByteArray(),root.resolve("cache"))).code());
         assertFalse(Files.exists(root.resolve("escaped.txt")));
+    }
+    @Test void bundledEngineAndDeclaredReportVersionAgree() {
+        Path home=AllureReports.engineHome();
+        var installed=Json.read(home.resolve("node_modules/allure/package.json"),Map.class);
+        assertEquals(AllureReports.VERSION,installed.get("version"));
+        assertTrue(Files.isRegularFile(home.resolve("package-lock.json")));
     }
     @Test void temporaryCleanupRejectsOtherDirectoriesAndPreservesTheirContents() throws Exception {
         Path ordinary=root.resolve("allure-report");Files.createDirectories(ordinary);Files.writeString(ordinary.resolve("index.html"),"Published evidence");

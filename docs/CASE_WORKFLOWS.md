@@ -136,6 +136,6 @@ node scripts/run-with-env.mjs --env-file C:\your-project\.env --chatgpt-project 
 node scripts/run-with-env.mjs --env-file C:\your-project\.env -- replay-case --config project.local.yaml --file .sf-e2e/cases/TST_my-flow-v1.local.json --params values.local.json
 ```
 
-Replay does not start a subscription adapter. Direct Java replay needs neither Node nor model credentials. Use `--java <Java 21 executable>` with the launcher if Java 21 is not the default runtime.
+Replay does not start a subscription adapter. Direct Java replay needs no model credentials. Its automatic Allure 3 reporting requires Node.js 26.10.0 or later. Use `--java <Java 21 executable>` with the launcher if Java 21 is not the default runtime.
 
 The workflow applies the [e2e principles of verified action replay, deterministic checks and redacted evidence](https://e2e.tester.army/docs). Full-case replay here always executes saved deterministic assertions; live AI judgments are not converted into assertions by caching their verdict.

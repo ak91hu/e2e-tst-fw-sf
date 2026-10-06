@@ -170,9 +170,9 @@ public final class PlaywrightEngine implements UiEngine {
         allowed(page.url());
         Failure.require(!FrameworkConfig.isAuthenticationRoute(page.url()),"EVIDENCE_WITHHELD","Authentication route cannot be observed");
     }
-    private static int closedRoots(com.fasterxml.jackson.databind.JsonNode node) {
-        int count=node.isObject() && "closed".equals(node.path("shadowRootType").asText())?1:0;
-        if(node.isContainerNode()) for(var child:node) count+=closedRoots(child);
+    private static int closedRoots(tools.jackson.databind.JsonNode node) {
+        int count=node.isObject() && "closed".equals(node.path("shadowRootType").asString())?1:0;
+        if(node.isContainer()) for(var child:node) count+=closedRoots(child);
         return count;
     }
     private boolean shadowCoverage() {
@@ -273,14 +273,14 @@ public final class PlaywrightEngine implements UiEngine {
             case "clickDialog" -> dialog(target,action.value(),deadline);
             case "lookup" -> {
                 var value=structured(action.value(),Set.of("query","option"));var wait=deadline.child(Duration.ofSeconds(config.execution().actionTimeoutSeconds()));
-                target.fill(value.path("query").asText(),new Locator.FillOptions().setTimeout(timeout(wait)));
-                var options=picklistOptions(frames.get(action.nodeId()),target,value.path("option").asText());
+                target.fill(value.path("query").asString(),new Locator.FillOptions().setTimeout(timeout(wait)));
+                var options=picklistOptions(frames.get(action.nodeId()),target,value.path("option").asString());
                 try { page.waitForCondition(() -> options.count()>0,new Page.WaitForConditionOptions().setTimeout(timeout(wait))); } catch(TimeoutError e) { throw new Failure("TARGET_NOT_FOUND","Lookup result did not appear after typing"); }
                 Failure.require(options.count()==1,"TARGET_AMBIGUOUS","Lookup result must be unique within the control-owned container");options.click(new Locator.ClickOptions().setTimeout(timeout(wait)));
             }
             case "multiSelect" -> {
                 var values=Json.MAPPER.valueToTree(parse(action.value()));Failure.require(values.isArray() && !values.isEmpty() && values.size()<=100,"CASE_INVALID","Multi-select requires a JSON label array");
-                Set<String> unique=new HashSet<>();List<SelectOption> options=new ArrayList<>();for(var value:values) { Failure.require(value.isTextual() && unique.add(value.asText()),"CASE_INVALID","Multi-select labels must be unique");options.add(new SelectOption().setLabel(value.asText())); }
+                Set<String> unique=new HashSet<>();List<SelectOption> options=new ArrayList<>();for(var value:values) { Failure.require(value.isString() && unique.add(value.asString()),"CASE_INVALID","Multi-select labels must be unique");options.add(new SelectOption().setLabel(value.asString())); }
                 if("SELECT".equals(target.evaluate("e => e.tagName"))) { Failure.require(Boolean.TRUE.equals(target.evaluate("e => e.multiple")),"AUTOMATION_UNSUPPORTED","Multi-select target is not a multiple select");target.selectOption(options.toArray(SelectOption[]::new),new Locator.SelectOptionOptions().setTimeout(timeout)); }
                 else {
                     Failure.require("true".equals(target.getAttribute("aria-multiselectable")) || "true".equals(target.evaluate("e => {const ids=(e.getAttribute('aria-controls')||e.getAttribute('aria-owns')||'').split(/\\s+/);return window.__sfE2e.elements().find(n=>ids.includes(n.id))?.getAttribute('aria-multiselectable')||'';}")),"AUTOMATION_UNSUPPORTED","Custom multi-select must declare its state and owned listbox");
@@ -310,9 +310,9 @@ public final class PlaywrightEngine implements UiEngine {
         }
         deadline.check(); revision++;
     }
-    private static com.fasterxml.jackson.databind.JsonNode parse(String value) { try { return Json.MAPPER.readTree(value); } catch(Exception e) { throw new Failure("CASE_INVALID","Operation parameter must be valid JSON"); } }
-    private static com.fasterxml.jackson.databind.JsonNode structured(String value,Set<String> required) {
-        var tree=parse(value);Failure.require(tree!=null && tree.isObject() && tree.size()==required.size() && required.stream().allMatch(k -> tree.path(k).isTextual()),"CASE_INVALID","Operation parameter keys/types are invalid");return tree;
+    private static tools.jackson.databind.JsonNode parse(String value) { try { return Json.MAPPER.readTree(value); } catch(Exception e) { throw new Failure("CASE_INVALID","Operation parameter must be valid JSON"); } }
+    private static tools.jackson.databind.JsonNode structured(String value,Set<String> required) {
+        var tree=parse(value);Failure.require(tree!=null && tree.isObject() && tree.size()==required.size() && required.stream().allMatch(k -> tree.path(k).isString()),"CASE_INVALID","Operation parameter keys/types are invalid");return tree;
     }
     /** Opt-in local input root; outputs belong to one attempt and are never attached as public screenshots. */
     public void configureFiles(java.nio.file.Path inputs,java.nio.file.Path ownedOutputs,java.util.function.Consumer<Map<String,Object>> events) {
@@ -331,14 +331,14 @@ public final class PlaywrightEngine implements UiEngine {
     }
     private void download(Locator target,String value,Deadline deadline) {
         Failure.require(downloadRoot!=null,"POLICY_DENIED","Configure owned download output before dispatch");var expected=structured(value,Set.of("sha256","text"));
-        Failure.require(expected.path("sha256").asText().matches("[a-f0-9]{64}"),"CASE_INVALID","Supply an exact expected download checksum");
+        Failure.require(expected.path("sha256").asString().matches("[a-f0-9]{64}"),"CASE_INVALID","Supply an exact expected download checksum");
         Download item=page.waitForDownload(new Page.WaitForDownloadOptions().setTimeout(timeout(deadline)),() -> target.click(new Locator.ClickOptions().setTimeout(timeout(deadline))));
         Failure.require(item.failure()==null,"FILE_VERIFICATION_FAILED","Download failed after dispatch");
         var output=SafePaths.inside(downloadRoot,UUID.randomUUID()+".download");
         try { var source=item.path();Failure.require(java.nio.file.Files.size(source)<=MAX_FILE_BYTES,"FILE_VERIFICATION_FAILED","Download exceeds 64 MiB");item.saveAs(output);byte[] bytes=java.nio.file.Files.readAllBytes(output);String hash=Json.hash(bytes);
             PrivateArtifacts.manifest(downloadRoot,downloadRoot.getParent().getFileName().toString(),output,MAX_FILE_BYTES);
             operationEvents.accept(Map.of("kind","file-transfer","direction","download","sha256",hash,"bytes",bytes.length,"path",output.getFileName().toString(),"confidential",true));
-            Failure.require(hash.equals(expected.path("sha256").asText()) && (expected.path("text").asText().isEmpty() || new String(bytes,StandardCharsets.UTF_8).equals(expected.path("text").asText())),"FILE_VERIFICATION_FAILED","Downloaded checksum/content does not match the supplied expectation"); }
+            Failure.require(hash.equals(expected.path("sha256").asString()) && (expected.path("text").asString().isEmpty() || new String(bytes,StandardCharsets.UTF_8).equals(expected.path("text").asString())),"FILE_VERIFICATION_FAILED","Downloaded checksum/content does not match the supplied expectation"); }
         catch(java.io.IOException e) { throw new Failure("FILE_VERIFICATION_FAILED","Owned download cannot be verified"); }
     }
     private void popup(Locator target,String expectedRoute,Deadline deadline) {
@@ -364,20 +364,20 @@ public final class PlaywrightEngine implements UiEngine {
         operationEvents.accept(Map.of("kind","private-trace-retained","classification","CONFIDENTIAL_RAW","attemptId",traceAttempt,"publicAttachment",false));
     }
     /** Audits approved frames independently; axe cannot certify closed shadow roots. Incomplete audits fail review. */
-    public com.fasterxml.jackson.databind.JsonNode accessibilityAudit(List<String> rules,Deadline deadline) {
+    public tools.jackson.databind.JsonNode accessibilityAudit(List<String> rules,Deadline deadline) {
         check(deadline);safePage();Failure.require(rules!=null && !rules.isEmpty() && rules.size()<=100 && rules.stream().allMatch(r -> r!=null && r.matches("[a-z0-9-]{1,100}")),"CONFIG_INVALID","Supply explicit axe rule IDs");
         var output=Json.MAPPER.createObjectNode();var violations=output.putArray("violations");var incomplete=output.putArray("incomplete");output.put("engine","axe-core-4.14.0");
         for(Frame frame:page.frames()) {
             Failure.require(frame==page.mainFrame() || config.origins().contains(origin(frame.url())),"QUALITY_GATE_FAILED","Accessibility frame is outside the authorized origin set");frame.evaluate(SCRIPT);
             Failure.require(((Number)frame.evaluate("() => window.__sfE2e.trackedClosedCount()")).intValue()==0,"AUTOMATION_UNSUPPORTED","axe cannot certify closed shadow trees");frame.evaluate(resource("axe.min.js"));
             var result=Json.MAPPER.valueToTree(frame.evaluate("rules => axe.run(document,{runOnly:{type:'rule',values:rules},iframes:false}).then(r => ({violations:r.violations.map(v=>({id:v.id,impact:v.impact,nodes:v.nodes.map(n=>({target:n.target}))})),incomplete:r.incomplete.map(v=>({id:v.id,impact:v.impact,nodes:v.nodes.map(n=>({target:n.target}))}))}))",rules));
-            for(String kind:List.of("violations","incomplete")) for(var issue:result.path(kind)) { var safe=Json.MAPPER.createObjectNode();safe.put("id",issue.path("id").asText());safe.put("impact",issue.path("impact").asText());var nodes=safe.putArray("nodes");for(var node:issue.path("nodes")) nodes.addObject().put("targetHash",Json.hash(Map.of("frame",secrets.redact(frame.url()),"target",node.path("target"))));(kind.equals("violations")?violations:incomplete).add(safe); }
+            for(String kind:List.of("violations","incomplete")) for(var issue:result.path(kind)) { var safe=Json.MAPPER.createObjectNode();safe.put("id",issue.path("id").asString());safe.put("impact",issue.path("impact").asString());var nodes=safe.putArray("nodes");for(var node:issue.path("nodes")) nodes.addObject().put("targetHash",Json.hash(Map.of("frame",secrets.redact(frame.url()),"target",node.path("target"))));(kind.equals("violations")?violations:incomplete).add(safe); }
             deadline.check();
         }
         return output;
     }
     public Map<String,Double> performanceMetrics(Deadline deadline) {
-        check(deadline);safePage();var values=Json.MAPPER.valueToTree(page.evaluate("() => { const n=performance.getEntriesByType('navigation')[0];const p=performance.getEntriesByType('paint');return {domContentLoadedMs:n?.domContentLoadedEventEnd || -1,responseMs:n?.responseEnd || -1,loadMs:n?.loadEventEnd || -1,elapsedMs:performance.now(),firstContentfulPaintMs:p.find(e=>e.name==='first-contentful-paint')?.startTime ?? -1}; }"));Map<String,Double> result=new LinkedHashMap<>();values.fields().forEachRemaining(e -> result.put(e.getKey(),e.getValue().asDouble()));return Map.copyOf(result);
+        check(deadline);safePage();var values=Json.MAPPER.valueToTree(page.evaluate("() => { const n=performance.getEntriesByType('navigation')[0];const p=performance.getEntriesByType('paint');return {domContentLoadedMs:n?.domContentLoadedEventEnd || -1,responseMs:n?.responseEnd || -1,loadMs:n?.loadEventEnd || -1,elapsedMs:performance.now(),firstContentfulPaintMs:p.find(e=>e.name==='first-contentful-paint')?.startTime ?? -1}; }"));Map<String,Double> result=new LinkedHashMap<>();values.properties().forEach(e -> result.put(e.getKey(),e.getValue().asDouble()));return Map.copyOf(result);
     }
     @Override public void switchPage(String handle,Deadline deadline) {
         check(deadline);Page selected=pageHandles.get(handle);Failure.require(selected!=null && !selected.isClosed(),"TARGET_NOT_FOUND","Page handle is unknown or closed");allowed(selected.url());page=selected;
@@ -385,18 +385,18 @@ public final class PlaywrightEngine implements UiEngine {
     }
     /** Locate one explicit row across bounded virtual scroll windows; never interpret visible rows as a total dataset. */
     private void gridFind(Locator grid,String value,Deadline deadline) {
-        var plan=structured(value,Set.of("row","maxScrolls"));int limit;try { limit=Integer.parseInt(plan.path("maxScrolls").asText()); } catch(Exception e) { throw new Failure("CASE_INVALID","Grid scroll bound must be an integer"); }
+        var plan=structured(value,Set.of("row","maxScrolls"));int limit;try { limit=Integer.parseInt(plan.path("maxScrolls").asString()); } catch(Exception e) { throw new Failure("CASE_INVALID","Grid scroll bound must be an integer"); }
         Failure.require(limit>=0 && limit<=100 && Set.of("grid","table","treegrid").contains(Objects.toString(grid.getAttribute("role"),"")),"CASE_INVALID","Grid requires an explicit role and 0..100 scroll bound");
         for(int i=0;i<=limit;i++) {
-            deadline.check();int count=((Number)grid.evaluate("(e,name)=>window.__sfE2e.elements(e).filter(n=>n.getAttribute('role')==='row' && window.__sfE2e.visible(n) && (n.getAttribute('aria-label')||n.textContent.trim())===name).length",plan.path("row").asText())).intValue();
+            deadline.check();int count=((Number)grid.evaluate("(e,name)=>window.__sfE2e.elements(e).filter(n=>n.getAttribute('role')==='row' && window.__sfE2e.visible(n) && (n.getAttribute('aria-label')||n.textContent.trim())===name).length",plan.path("row").asString())).intValue();
             Failure.require(count<=1,"TARGET_AMBIGUOUS","Virtual grid row name is ambiguous");if(count==1) return;
             if(i==limit) break;boolean moved=Boolean.TRUE.equals(grid.evaluate("e=>{const old=e.scrollTop;e.scrollTop+=Math.max(1,e.clientHeight);return e.scrollTop!==old;}"));if(!moved) break;poll(deadline);
         }
         throw new Failure("ASSERTION_FAILED","Expected virtual grid row was not found within its supplied scroll bound");
     }
     private void dialog(Locator target,String value,Deadline deadline) {
-        var plan=structured(value,Set.of("type","message","decision","prompt"));Failure.require(Set.of("alert","confirm","prompt","beforeunload").contains(plan.path("type").asText()) && Set.of("accept","dismiss").contains(plan.path("decision").asText()),"CASE_INVALID","Invalid dialog expectation");
-        final boolean[] received={false},matched={false};java.util.function.Consumer<Dialog> listener=d -> { received[0]=true;matched[0]=d.type().equals(plan.path("type").asText()) && d.message().equals(plan.path("message").asText());if(matched[0] && plan.path("decision").asText().equals("accept")) d.accept(plan.path("prompt").asText());else d.dismiss(); };
+        var plan=structured(value,Set.of("type","message","decision","prompt"));Failure.require(Set.of("alert","confirm","prompt","beforeunload").contains(plan.path("type").asString()) && Set.of("accept","dismiss").contains(plan.path("decision").asString()),"CASE_INVALID","Invalid dialog expectation");
+        final boolean[] received={false},matched={false};java.util.function.Consumer<Dialog> listener=d -> { received[0]=true;matched[0]=d.type().equals(plan.path("type").asString()) && d.message().equals(plan.path("message").asString());if(matched[0] && plan.path("decision").asString().equals("accept")) d.accept(plan.path("prompt").asString());else d.dismiss(); };
         armedDialog=listener;try { target.click(new Locator.ClickOptions().setTimeout(timeout(deadline)));Failure.require(received[0] && matched[0],"ASSERTION_FAILED","Native dialog did not match its explicit expectation"); }
         finally { armedDialog=null; }
     }
@@ -425,13 +425,13 @@ public final class PlaywrightEngine implements UiEngine {
             var rows=Json.MAPPER.valueToTree(page.evaluate("() => window.__sfE2e.fields()"));
             Map<String,String> fields=new LinkedHashMap<>();
             for(var row:rows) {
-                String label=row.path("label").asText(),value=secrets.redact(row.path("value").asText());
+                String label=row.path("label").asString(),value=secrets.redact(row.path("value").asString());
                 Failure.require(!fields.containsKey(label),"TARGET_AMBIGUOUS","Duplicate visible Details field: " + label);
                 fields.put(label,value);
                 for(var link:row.path("links")) {
-                    String key=label+"::link::"+link.path("name").asText();
+                    String key=label+"::link::"+link.path("name").asString();
                     Failure.require(!fields.containsKey(key),"TARGET_AMBIGUOUS","Duplicate field relationship link");
-                    fields.put(key,link.path("href").asText());
+                    fields.put(key,link.path("href").asString());
                 }
             }
             return Map.copyOf(fields);

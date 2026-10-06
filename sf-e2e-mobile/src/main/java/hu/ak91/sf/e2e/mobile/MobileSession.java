@@ -1,6 +1,6 @@
 package hu.ak91.sf.e2e.mobile;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import hu.ak91.sf.e2e.core.*;
 import java.net.*;
 import java.net.http.*;
@@ -29,12 +29,12 @@ public final class MobileSession implements AutoCloseable {
         Failure.require(Set.of("Android","iOS").contains(capabilities.get("platformName")) && capabilities.get("appium:automationName") instanceof String && capabilities.size()<=50 && !capabilities.containsKey("browserName"),"CONFIG_INVALID","Native mobile requires platform and driver capabilities; browser sessions use the web engine");
         this.endpoint=endpoint.replaceAll("/$","");this.deadline=deadline;this.secrets=secrets;this.events=events;
         JsonNode created=request("POST","/session",Map.of("capabilities",Map.of("alwaysMatch",capabilities,"firstMatch",List.of(Map.of()))),true);
-        session=created.path("sessionId").asText();var confirmed=created.path("capabilities");
-        try { Failure.require(session.matches("[A-Za-z0-9_.-]{1,200}") && confirmed.isObject() && confirmed.path("platformName").asText().equals(capabilities.get("platformName")) && capability(confirmed,"automationName").equals(capabilities.get("appium:automationName")),"MOBILE_CAPABILITY_CHANGED","Appium did not confirm the required native platform/driver"); }
+        session=created.path("sessionId").asString();var confirmed=created.path("capabilities");
+        try { Failure.require(session.matches("[A-Za-z0-9_.-]{1,200}") && confirmed.isObject() && confirmed.path("platformName").asString().equals(capabilities.get("platformName")) && capability(confirmed,"automationName").equals(capabilities.get("appium:automationName")),"MOBILE_CAPABILITY_CHANGED","Appium did not confirm the required native platform/driver"); }
         catch(Failure e) {if(session.matches("[A-Za-z0-9_.-]{1,200}")) try {request("DELETE","/session/"+session,null,true);}catch(Failure ignored) {}throw e;}
         namespace="native-w3c-v1|"+Json.hash(capabilities)+"|"+Json.hash(Map.of("platformVersion",capability(confirmed,"platformVersion"),"automationName",capability(confirmed,"automationName"),"appPackage",capability(confirmed,"appPackage"),"bundleId",capability(confirmed,"bundleId")));
     }
-    private static String capability(JsonNode node,String key) { return node.has("appium:"+key)?node.path("appium:"+key).asText():node.path(key).asText(); }
+    private static String capability(JsonNode node,String key) { return node.has("appium:"+key)?node.path("appium:"+key).asString():node.path(key).asString(); }
     public String namespace() { return namespace; }
     private void check() { Failure.require(Thread.currentThread()==owner && !closed,"ENGINE_THREAD_VIOLATION","Native session must use its open owner thread");deadline.check(); }
     public void saveMap(Path file,Map<String,List<Target>> targets) {
@@ -48,8 +48,8 @@ public final class MobileSession implements AutoCloseable {
     private Resolved resolve(List<Target> targets) {
         check();int index=-1;for(var target:targets) {index++;
             JsonNode matches=request("POST","/session/"+session+"/elements",Map.of("using",target.using(),"value",target.value()),false);Failure.require(matches.isArray(),"MOBILE_PROTOCOL_INVALID","Element lookup returned an invalid array");
-            if(matches.isEmpty()) continue;Failure.require(matches.size()==1,"TARGET_AMBIGUOUS","Native target has multiple matches");String id=matches.get(0).path("element-6066-11e4-a52e-4f735466cecf").asText();Failure.require(id.matches("[A-Za-z0-9_.-]{1,200}"),"MOBILE_PROTOCOL_INVALID","Invalid native element identity");
-            String path="/session/"+session+"/element/"+id;String name=request("GET",path+"/attribute/name",null,false).asText();Failure.require(name.equals(target.exactAccessibleName()),"TARGET_IDENTITY_MISMATCH","Native element accessible name differs from the reviewed target");
+            if(matches.isEmpty()) continue;Failure.require(matches.size()==1,"TARGET_AMBIGUOUS","Native target has multiple matches");String id=matches.get(0).path("element-6066-11e4-a52e-4f735466cecf").asString();Failure.require(id.matches("[A-Za-z0-9_.-]{1,200}"),"MOBILE_PROTOCOL_INVALID","Invalid native element identity");
+            String path="/session/"+session+"/element/"+id;String name=request("GET",path+"/attribute/name",null,false).asString();Failure.require(name.equals(target.exactAccessibleName()),"TARGET_IDENTITY_MISMATCH","Native element accessible name differs from the reviewed target");
             Failure.require(request("GET",path+"/displayed",null,false).asBoolean() && request("GET",path+"/enabled",null,false).asBoolean(),"TARGET_NOT_ACTIONABLE","Native target is hidden or disabled");return new Resolved(id,index);
         }throw new Failure("TARGET_NOT_FOUND","No reviewed native locator matches");
     }
@@ -74,11 +74,11 @@ public final class MobileSession implements AutoCloseable {
     }
     public void expectText(MapDocument map,String key,String expected) {
         Failure.require(map.targets().containsKey(key) && namespace.equals(map.namespace()) && Json.hash(map.targets()).equals(map.checksum()),"MOBILE_CAPABILITY_CHANGED","Native assertion requires a valid capability-specific map");String id=resolve(map.targets().get(key)).id();
-        Failure.require(request("GET","/session/"+session+"/element/"+id+"/text",null,false).asText().equals(expected),"ASSERTION_FAILED","Native text differs from the supplied expectation");
+        Failure.require(request("GET","/session/"+session+"/element/"+id+"/text",null,false).asString().equals(expected),"ASSERTION_FAILED","Native text differs from the supplied expectation");
     }
     /** Raw native screenshots are private; no claim that browser PNG masking applies to this backend. */
     public Path privateScreenshot(Path directory,String attemptId,int retentionHours) {
-        check();Path root=PrivateArtifacts.create(directory,attemptId,retentionHours);String encoded=request("GET","/session/"+session+"/screenshot",null,false).asText();
+        check();Path root=PrivateArtifacts.create(directory,attemptId,retentionHours);String encoded=request("GET","/session/"+session+"/screenshot",null,false).asString();
         try {byte[] bytes=Base64.getDecoder().decode(encoded);Failure.require(bytes.length<=8*1024*1024 && bytes.length>=8 && bytes[0]==(byte)137 && bytes[1]==80,"PNG_INVALID","Native screenshot must be a bounded PNG");Path output=SafePaths.inside(root,UUID.randomUUID()+".png");Files.write(output,bytes,StandardOpenOption.CREATE_NEW);PrivateArtifacts.manifest(root,attemptId,output,8*1024*1024);return output;}catch(java.io.IOException | IllegalArgumentException e) {throw new Failure("EVIDENCE_INCOMPLETE","Native screenshot cannot be persisted");}
     }
     private JsonNode request(String method,String path,Object body,boolean mutation) {

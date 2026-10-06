@@ -64,16 +64,16 @@ public final class JsonModelClient implements ModelClient {
     }
     static Map<String,Object> body(FrameworkConfig.Agent policy,Request request) { return body(policy,request,policy.workflow().compactRequests()); }
     static Map<String,Object> body(FrameworkConfig.Agent policy,Request request,boolean compact) {
-        var content=(com.fasterxml.jackson.databind.node.ObjectNode)Json.MAPPER.valueToTree(request);content.remove("fullOutput");
+        var content=(tools.jackson.databind.node.ObjectNode)Json.MAPPER.valueToTree(request);content.remove("fullOutput");
         boolean readOnly=DISCOVERY.contains(request.kind());
         if(compact && readOnly) {
             if(content.path("ledger").isEmpty()) content.remove("ledger");
             if(content.path("observation").isObject()) {
-                var observation=(com.fasterxml.jackson.databind.node.ObjectNode)content.get("observation");observation.remove(List.of("revision","capturedAt"));
+                var observation=(tools.jackson.databind.node.ObjectNode)content.get("observation");observation.remove(List.of("revision","capturedAt"));
                 for(var node:observation.path("nodes")) {
-                    var object=(com.fasterxml.jackson.databind.node.ObjectNode)node;
-                    for(String field:List.of("text","value")) if(object.path(field).asText().isEmpty()) object.remove(field);
-                    var target=(com.fasterxml.jackson.databind.node.ObjectNode)object.get("target");
+                    var object=(tools.jackson.databind.node.ObjectNode)node;
+                    for(String field:List.of("text","value")) if(object.path(field).asString().isEmpty()) object.remove(field);
+                    var target=(tools.jackson.databind.node.ObjectNode)object.get("target");
                     for(String field:List.of("role","name","label","container")) if(target.path(field).isNull()) target.remove(field);
                 }
             }
@@ -93,32 +93,30 @@ public final class JsonModelClient implements ModelClient {
             Failure.require(response.body().length()<=2*1024*1024,"CONTEXT_OVERFLOW","Model response exceeds size limit");
             var tree=Json.MAPPER.readTree(response.body());
             var choice=tree.path("choices").path(0);
-            Failure.require(!choice.path("finish_reason").asText().equals("length"),"MODEL_OUTPUT_LIMIT","Model output reached its token allowance");
-            Failure.require(tree.path("choices").size()==1 && choice.path("finish_reason").asText().equals("stop") &&
+            Failure.require(!choice.path("finish_reason").asString().equals("length"),"MODEL_OUTPUT_LIMIT","Model output reached its token allowance");
+            Failure.require(tree.path("choices").size()==1 && choice.path("finish_reason").asString().equals("stop") &&
                 (choice.path("message").path("refusal").isMissingNode() || choice.path("message").path("refusal").isNull()),
                 "MODEL_OUTPUT_INVALID","Model completion is incomplete or refused");
-            String content=tree.path("choices").path(0).path("message").path("content").asText();
+            String content=tree.path("choices").path(0).path("message").path("content").asString();
             var result=Json.MAPPER.readTree(content);
             var usage=tree.path("usage").path("total_tokens");
             Failure.require(usage.isMissingNode() || usage.isNull() || usage.isIntegralNumber() && usage.canConvertToLong() && usage.asLong()>=0,
                 "AI_USAGE_INVALID","Provider token usage has an invalid type");
             Long tokens=usage.isMissingNode() || usage.isNull()?null:usage.asLong();
-            ((com.fasterxml.jackson.databind.node.ObjectNode)result).put("tokens",tokens);
+            ((tools.jackson.databind.node.ObjectNode)result).put("tokens",tokens);
             Long input=usage(tree.path("usage").path("prompt_tokens")),output=usage(tree.path("usage").path("completion_tokens"));
             Failure.require((input==null)==(output==null) && (input==null || tokens!=null && input<=tokens && output==tokens-input),
                 "AI_USAGE_INVALID","Provider token breakdown is inconsistent");
-            ((com.fasterxml.jackson.databind.node.ObjectNode)result).put("inputTokens",input);
-            ((com.fasterxml.jackson.databind.node.ObjectNode)result).put("outputTokens",output);
+            ((tools.jackson.databind.node.ObjectNode)result).put("inputTokens",input);
+            ((tools.jackson.databind.node.ObjectNode)result).put("outputTokens",output);
             return Json.MAPPER.treeToValue(result,Response.class);
         } catch(Failure e) { throw e; }
         catch(InterruptedException e) { Thread.currentThread().interrupt(); throw new Failure("CANCELLED","Model request interrupted"); }
-        catch(java.io.IOException e) {
-            if(e instanceof com.fasterxml.jackson.core.JsonProcessingException) throw new Failure("MODEL_OUTPUT_INVALID","Provider response has invalid JSON");
-            throw new Failure("MODEL_UNAVAILABLE","Model transport failed");
-        }
+        catch(tools.jackson.core.JacksonException e) { throw new Failure("MODEL_OUTPUT_INVALID","Provider response has invalid JSON"); }
+        catch(java.io.IOException e) { throw new Failure("MODEL_UNAVAILABLE","Model transport failed"); }
         catch(Exception e) { throw new Failure("MODEL_OUTPUT_INVALID","Model transport or JSON protocol failed"); }
     }
-    private static Long usage(com.fasterxml.jackson.databind.JsonNode value) {
+    private static Long usage(tools.jackson.databind.JsonNode value) {
         Failure.require(value.isMissingNode() || value.isNull() || value.isIntegralNumber() && value.canConvertToLong() && value.asLong()>=0,
             "AI_USAGE_INVALID","Provider token usage has an invalid type");
         return value.isMissingNode() || value.isNull()?null:value.asLong();

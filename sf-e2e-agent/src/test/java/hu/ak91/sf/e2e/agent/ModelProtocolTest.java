@@ -21,7 +21,7 @@ class ModelProtocolTest {
             assertEquals("POST",exchange.getRequestMethod());
             assertEquals("Bearer PRIVATE_PROTOCOL_SENTINEL",exchange.getRequestHeaders().getFirst("Authorization"));
             var sent=Json.MAPPER.readTree(exchange.getRequestBody());
-            assertEquals("json_object",sent.path("response_format").path("type").asText());assertEquals(2,sent.path("messages").size());
+            assertEquals("json_object",sent.path("response_format").path("type").asString());assertEquals(2,sent.path("messages").size());
             assertEquals(4096,sent.path("max_completion_tokens").asInt());assertFalse(sent.has("max_tokens"));
             byte[] bytes=body.getBytes(StandardCharsets.UTF_8);exchange.getResponseHeaders().set("Content-Type","application/json");
             exchange.sendResponseHeaders(status,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();
@@ -60,7 +60,7 @@ class ModelProtocolTest {
         var response=client(200,body).complete(request(),Deadline.after(Duration.ofSeconds(5)));assertEquals(25L,response.tokens());assertEquals(20L,response.inputTokens());assertEquals(5L,response.outputTokens());
     }
     @Test void inconsistentProviderBreakdownCannotBecomeCheapValidUsage() throws Exception {
-        var body=Json.MAPPER.readTree(body("stop",25));((com.fasterxml.jackson.databind.node.ObjectNode)body.get("usage")).put("prompt_tokens",20).put("completion_tokens",10);
+        var body=Json.MAPPER.readTree(body("stop",25));((tools.jackson.databind.node.ObjectNode)body.get("usage")).put("prompt_tokens",20).put("completion_tokens",10);
         var client=client(200,Json.string(body));assertEquals("AI_USAGE_INVALID",assertThrows(Failure.class,() -> client.complete(request(),Deadline.after(Duration.ofSeconds(5)))).code());
     }
 }

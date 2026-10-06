@@ -1,6 +1,7 @@
 .reference/
 .tools/
 **/target/
+**/node_modules/
 .sf-e2e/
 .sf-e2e-data/
 .sf-e2e-reports/

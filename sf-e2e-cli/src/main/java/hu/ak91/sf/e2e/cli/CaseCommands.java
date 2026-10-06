@@ -30,9 +30,9 @@ public final class CaseCommands {
             if(params==null) return Map.of();
             var node=readJson(params);Failure.require(node.isObject() && node.size()<=200,"CASE_INVALID","Parameters must be a JSON object with at most 200 string values");
             Map<String,String> values=new TreeMap<>();
-            node.fields().forEachRemaining(e -> {
-                CaseSpec.validateRef(e.getKey());Failure.require(e.getValue().isTextual() && e.getValue().asText().length()<=10000,"CASE_INVALID","Parameter values must be strings of at most 10000 characters");
-                values.put(e.getKey(),e.getValue().asText());
+            node.properties().forEach(e -> {
+                CaseSpec.validateRef(e.getKey());Failure.require(e.getValue().isString() && e.getValue().asString().length()<=10000,"CASE_INVALID","Parameter values must be strings of at most 10000 characters");
+                values.put(e.getKey(),e.getValue().asString());
             });return Map.copyOf(values);
         }
     }
@@ -203,7 +203,7 @@ public final class CaseCommands {
         requireNewOutput(requested);var named=CaseNames.output(requested);requireNewOutput(named);return named;
     }
     private static Path parameterOutput(Path file) { return file.resolveSibling(file.getFileName()+".params.local.json"); }
-    static com.fasterxml.jackson.databind.JsonNode readJson(Path file) {
+    static tools.jackson.databind.JsonNode readJson(Path file) {
         try { return Json.MAPPER.readTree(readText(file,1024*1024)); }
         catch(Failure e) { throw e; } catch(Exception e) { throw new Failure("CASE_INVALID","Invalid case JSON"); }
     }

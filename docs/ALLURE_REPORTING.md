@@ -1,8 +1,10 @@
 # Automatic Allure reporting
 
-The report engine is official Allure 2.46.1, bundled during the Maven build. JUnit `run`, dataset `run-suite`, file learning/discovery/replay, `run-components` and `run-release-matrix` automatically render after execution, including unsuccessful attempts. Reporting uses no AI. Completed supported runs also generate context-separated `trends.html`; see [efficiency workflows](EFFICIENCY_WORKFLOWS.md).
+The report engine is official Allure 3.20.1, bundled during the Maven build. JUnit `run`, dataset `run-suite`, file learning/discovery/replay, `run-components` and `run-release-matrix` automatically render after execution, including unsuccessful attempts. Reporting uses no AI. Completed supported runs also generate context-separated `trends.html`; see [efficiency workflows](EFFICIENCY_WORKFLOWS.md).
 
-The command prints the run's `index.html`. Open it directly in a browser: Allure's single-file output embeds the report application, data and attachments. The report is also available at `allure-report/index.html`. No global Allure installation, Node process, report server or runtime internet download is required. Java 21 runs the bundled engine. Maven downloads the pinned distribution when building; first runtime use extracts it into a hash/version-specific cache under the user's `.sf-e2e/tools` directory.
+The command prints the run's `index.html`. Open it directly in a browser: Allure's single-file output embeds the report application, data and attachments. The report is also available at `allure-report/index.html`. No global Allure installation, report server or runtime internet download is required. Node.js 26.10.0 or later runs the bundled engine; install Node on `PATH` or set the JVM property `-Dsf.e2e.nodeExecutable=<absolute node executable>`. Maven invokes the build-time npm adapter with the checked-in lockfile and bundles its pinned installation; first runtime use extracts it into a hash/version-specific cache under the user's `.sf-e2e/tools` directory.
+
+Published standalone HTML includes a content security policy that permits embedded resources and blocks external network requests, including upstream analytics. This policy is applied before the published HTML checksum is recorded.
 
 ## What the report contains
 

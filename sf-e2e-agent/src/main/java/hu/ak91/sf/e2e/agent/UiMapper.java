@@ -2,7 +2,7 @@ package hu.ak91.sf.e2e.agent;
 
 import hu.ak91.sf.e2e.core.*;
 import hu.ak91.sf.e2e.core.locator.*;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -64,7 +64,7 @@ public final class UiMapper {
         Map<String,Observation.Node> byId=new HashMap<>();eligible.forEach(n -> byId.put(n.id(),n));
         Set<String> keys=new HashSet<>(),ids=new HashSet<>();List<LocatorEntry> result=new ArrayList<>();
         for(var item:response.data().path("targets")) {
-            String key=item.path("key").asText(),id=item.path("nodeId").asText();
+            String key=item.path("key").asString(),id=item.path("nodeId").asString();
             Failure.require(keys.add(key) && !key.startsWith("records.") && ids.add(id) && byId.containsKey(id) && !secrets.containsSecret(key),
                 "MODEL_OUTPUT_INVALID","Mapping has duplicate keys, invalid node references or secret-derived keys");
             LocatorEntry mapped=LocatorEntry.mapped(page,key,observed,byId.get(id),engine.capabilityVersion());

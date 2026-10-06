@@ -35,11 +35,11 @@ public final class QualityModules {
         for(var entry:maximum.entrySet()) Failure.require(measured.containsKey(entry.getKey()) && Double.isFinite(measured.get(entry.getKey())) && measured.get(entry.getKey())>=0 && measured.get(entry.getKey())<=entry.getValue(),"QUALITY_GATE_FAILED","Missing or exceeded performance metric: "+entry.getKey());
     }
     /** axe output contains only exact target hashes/rule IDs, never DOM HTML or unredacted node text. */
-    public static void accessibility(com.fasterxml.jackson.databind.JsonNode result,Set<String> failImpacts,List<Waiver> waivers,Clock clock) {
+    public static void accessibility(tools.jackson.databind.JsonNode result,Set<String> failImpacts,List<Waiver> waivers,Clock clock) {
         Failure.require(result.path("violations").isArray() && result.path("incomplete").isArray(),"QUALITY_GATE_FAILED","Accessibility audit did not complete");
         Failure.require(failImpacts!=null && !failImpacts.isEmpty() && Set.of("minor","moderate","serious","critical").containsAll(failImpacts),"CONFIG_INVALID","Declare accessibility severity thresholds");
-        for(var violation:result.path("violations")) if(failImpacts.contains(violation.path("impact").asText())) for(var node:violation.path("nodes")) {
-            String rule=violation.path("id").asText(),hash=node.path("targetHash").asText();
+        for(var violation:result.path("violations")) if(failImpacts.contains(violation.path("impact").asString())) for(var node:violation.path("nodes")) {
+            String rule=violation.path("id").asString(),hash=node.path("targetHash").asString();
             boolean waived=waivers.stream().anyMatch(w -> w.rule().equals(rule) && w.targetHash().equals(hash) && !LocalDate.now(clock).isAfter(w.expires()));Failure.require(waived,"QUALITY_GATE_FAILED","Accessibility rule failed: "+rule+" target "+hash);
         }
         Failure.require(result.path("incomplete").isEmpty(),"QUALITY_REVIEW_REQUIRED","Accessibility audit has incomplete checks requiring review");

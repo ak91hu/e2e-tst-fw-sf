@@ -1,0 +1,9 @@
+{
+  "name": "sf-e2e-allure-engine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build-time dependencies bundled for offline Allure report rendering",
+  "engines": { "node": ">=26.10.0" },
+  "packageManager": "npm@12.2.0",
+  "dependencies": { "allure": "3.20.1" }
+}

@@ -25,11 +25,11 @@ public final class SecretRegistry {
         result = result.replaceAll("(?i)(Bearer\\s+)[^\\s\\x22<>]+", "$1[REDACTED]");
         return result.replaceAll("(?i)((?:[?&]|&amp;)(?:sid|otp|cshc|access_token|refresh_token|assertion|code|startURL|retURL)=)[^&#\\s\\x22<>]*", "$1[REDACTED]");
     }
-    public com.fasterxml.jackson.databind.JsonNode redactTree(com.fasterxml.jackson.databind.JsonNode node) {
-        if(node.isTextual()) return Json.MAPPER.getNodeFactory().textNode(redact(node.asText()));
+    public tools.jackson.databind.JsonNode redactTree(tools.jackson.databind.JsonNode node) {
+        if(node.isString()) return Json.MAPPER.getNodeFactory().textNode(redact(node.asString()));
         if(node.isObject()) {
             var result=Json.MAPPER.createObjectNode();
-            node.fields().forEachRemaining(e -> result.set(redact(e.getKey()),redactTree(e.getValue())));return result;
+            node.properties().forEach(e -> result.set(redact(e.getKey()),redactTree(e.getValue())));return result;
         }
         if(node.isArray()) { var result=Json.MAPPER.createArrayNode();node.forEach(child -> result.add(redactTree(child)));return result; }
         return node.deepCopy();

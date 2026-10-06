@@ -95,19 +95,19 @@ class CaseWorkflowHarnessIT {
             provider.createContext("/model",e -> {
                 calls.incrementAndGet();
                 try {
-                    var raw=Json.MAPPER.readTree(e.getRequestBody().readAllBytes());String content=raw.path("messages").get(1).path("content").asText();requests.add(content);
-                    var request=Json.MAPPER.readTree(content);String kind=request.path("kind").asText();Object data;
+                    var raw=Json.MAPPER.readTree(e.getRequestBody().readAllBytes());String content=raw.path("messages").get(1).path("content").asString();requests.add(content);
+                    var request=Json.MAPPER.readTree(content);String kind=request.path("kind").asString();Object data;
                     switch(kind) {
                         case "case-plan" -> data=Map.of("steps",spec().steps());
                         case "case-target" -> {
-                            String target=request.path("params").path("target").asText();String role=switch(target) {case "Continue" -> "link";case "Input" -> "textbox";case "Submit" -> "button";default -> "status";};
+                            String target=request.path("params").path("target").asString();String role=switch(target) {case "Continue" -> "link";case "Input" -> "textbox";case "Submit" -> "button";default -> "status";};
                             var nodes=request.path("observation").path("nodes");String id=null;
-                            for(var n:nodes) if(n.path("target").path("role").asText().equals(role) && (!target.equals("Continue") || n.path("target").path("name").asText().equals("Continue"))) { id=n.path("id").asText();break; }
+                            for(var n:nodes) if(n.path("target").path("role").asString().equals(role) && (!target.equals("Continue") || n.path("target").path("name").asString().equals("Continue"))) { id=n.path("id").asString();break; }
                             data=Map.of("nodeId",Objects.requireNonNull(id));
                         }
                         case "map" -> {
                             var targets=new ArrayList<Map<String,String>>();int index=0;
-                            for(var n:request.path("observation").path("nodes")) targets.add(Map.of("key","control."+(++index),"nodeId",n.path("id").asText()));
+                            for(var n:request.path("observation").path("nodes")) targets.add(Map.of("key","control."+(++index),"nodeId",n.path("id").asString()));
                             data=Map.of("targets",targets);
                         }
                         case "discover-routes" -> data=Map.of("routes",List.of("/editor"));

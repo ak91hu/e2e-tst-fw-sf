@@ -24,6 +24,6 @@ public final class ModelHealingAdvisor implements HealingLocators.Advisor {
         budget.usage(response.tokens());
         Failure.require("finish".equals(response.tool()) && "PASSED".equals(response.verdict()) && response.errorCode()==null &&
             response.nodeId()==null && response.value()==null && response.paramRef()==null,"MODEL_OUTPUT_INVALID","AI healing must return a read-only structured finish");
-        JsonSchema.validate(response.data(),schema);return response.data().path("nodeId").asText();
+        JsonSchema.validate(response.data(),schema);return response.data().path("nodeId").asString();
     }
 }

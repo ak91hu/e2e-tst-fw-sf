@@ -1,30 +1,12 @@
 # General Salesforce UI Mapping & Self-Healing Framework
 
-![Java 21](https://img.shields.io/badge/Java-21-007396)
-![Maven Wrapper 3.9.9](https://img.shields.io/badge/Maven_Wrapper-3.9.9-C71A36)
+![Java 27 build](https://img.shields.io/badge/Java_build-27-007396)
 ![Playwright 1.63.0](https://img.shields.io/badge/Playwright-1.63.0-2EAD33)
-![JUnit Jupiter 5.12.2](https://img.shields.io/badge/JUnit_Jupiter-5.12.2-25A162)
-![Allure 2.46.1](https://img.shields.io/badge/Allure-2.46.1-FF6B00)
-![Timestamped reports](https://img.shields.io/badge/Reports-UTC_timestamped-FF6B00)
-![Default screenshots](https://img.shields.io/badge/Screenshots-enabled_by_default-2EAD33)
-![Self healing](https://img.shields.io/badge/Locators-self_healing-238636)
-![Quality gates](https://img.shields.io/badge/Quality-application_defect_gates-D92D20)
-![Data driven](https://img.shields.io/badge/Suites-data_driven-007396)
-![English guide](https://img.shields.io/badge/Documentation-English_engineering_guide-6F42C1)
-![Org independent](https://img.shields.io/badge/Salesforce-org_independent-00A1E0)
-![Model-free execution](https://img.shields.io/badge/Execution-model_free-238636)
-![Business test workspace empty](https://img.shields.io/badge/Business_tests-empty-6F42C1)
-![REST oracle](https://img.shields.io/badge/Backend-REST_oracles_and_owned_fixtures-00A1E0)
-![Isolated workers](https://img.shields.io/badge/Suite_workers-1_to_8_isolated-007396)
-![Web engines](https://img.shields.io/badge/Web-Chromium_Firefox_WebKit-2EAD33)
-![axe-core](https://img.shields.io/badge/Accessibility-axe--core_4.14.0-663399)
-![Page Object Model](https://img.shields.io/badge/Default_architecture-Page_Object_Model-007396)
-![Test names](https://img.shields.io/badge/Generated_cases-TST__prefix-25A162)
-![Change impact](https://img.shields.io/badge/Selection-reviewed_change_impact-007396)
-![Run trends](https://img.shields.io/badge/Trends-context_separated_p50_p95-FF6B00)
-![LWC component runner](https://img.shields.io/badge/Components-pinned_LWC_Jest-00A1E0)
+![JUnit Jupiter 6.1.3](https://img.shields.io/badge/JUnit_Jupiter-6.1.3-25A162)
+![Allure 3.20.1](https://img.shields.io/badge/Allure-3.20.1-FF6B00)
+![Page Object Model](https://img.shields.io/badge/Default-Page_Object_Model-007396)
 
-Java 21, Maven, JUnit Jupiter and Playwright. The user test workspace is empty. The framework has no customer org, business schema, profile name, Opportunity stages or predefined business scenarios.
+Java, Maven, JUnit Jupiter and Playwright, with Allure 3 reporting. The user test workspace is empty. The framework has no customer org, business schema, profile name, Opportunity stages or predefined business scenarios.
 
 The lifecycle is **AI discovery/learning -> persistent locators and verified case recipes -> deterministic execution -> bounded retries -> confident repair and persistence**. Supply a test case as JSON or text, or discover visible navigation pages autonomously. Saved recipes rerun without AI, generated Java code or recompilation. Each installation supplies its own connection and inputs; ordinary execution and deterministic healing use no model.
 
@@ -32,7 +14,7 @@ The lifecycle is **AI discovery/learning -> persistent locators and verified cas
 
 Quality is the primary purpose. A run must establish the caller's expected business outcome and surface application defects. Browser errors and failed application requests can fail an otherwise successful-looking UI flow. Healing updates locator identity; it never changes an assertion or makes an unexpected business result pass. Dataset suites retain every selected outcome, including failures and rows skipped by fail-fast.
 
-The badges describe the checked-in stack and features; they do not claim a hosted CI run. Framework verification harnesses exercise the implementation against synthetic HTML, mock model responses and local HTTP services. They live in the implementation modules and are separate from the empty consumer test workspace.
+The [stable tooling snapshot](docs/DEPENDENCIES.md) lists the checked versions and migration requirements. The badges describe the checked-in stack and features; they do not claim a hosted CI run. Framework verification harnesses exercise the implementation against synthetic HTML, mock model responses and local HTTP services. They live in the implementation modules and are separate from the empty consumer test workspace.
 
 ## Contents
 
@@ -111,9 +93,9 @@ For a supplied case, learning is the first actual execution: it fills/clicks the
 
 ## Prerequisites and first run
 
-Use JDK 21 with `JAVA_HOME` configured. The included Maven Wrapper needs no global Maven installation. Initial dependency/Allure/browser installation needs network access. Live execution needs its selected browser; full framework checks exercise Chromium, Firefox and WebKit and need all three. Report rendering works offline after building.
+Use the latest stable JDK 27 with `JAVA_HOME` configured and Node.js 26.10.0 (npm 12.2.0) on `PATH`. The Java bytecode baseline remains 21 so existing consumers do not need a language-level migration. The included Maven Wrapper needs no global Maven installation. Initial dependency/Allure/browser installation needs network access. Live execution needs its selected browser; full framework checks exercise Chromium, Firefox and WebKit and need all three. Report rendering works offline after building.
 
-For live Salesforce work, provide an authorized JWT configuration or external Playwright storage-state session, the application's exact HTTPS origins, and access to the UI you want to map. Configure a compatible model endpoint only for the initial learning/mapping phase. Node is needed for the optional external-environment/subscription launcher, Git collector and LWC/Jest component runner. Ordinary Java browser execution, AI-free replay and Allure/trend reporting need no Node runtime.
+For live Salesforce work, provide an authorized JWT configuration or external Playwright storage-state session, the application's exact HTTPS origins, and access to the UI you want to map. Configure a compatible model endpoint only for the initial learning/mapping phase. Node is required to build and render Allure 3 reports. It also runs the optional external-environment/subscription launcher, Git collector and LWC/Jest component runner. Replay uses no AI; its automatic Allure report uses the local Node runtime. Trend rendering itself remains Java-only.
 
 Start with this sequence:
 
@@ -391,7 +373,7 @@ The optional external-environment launcher loads a supplied `.env` without copyi
 node scripts/run-with-env.mjs --env-file C:/private/project/.env --java C:/jdk-21/bin/java.exe -- replay-case --config project.local.yaml --file .sf-e2e/cases/TST_flow-v1.local.json --params inputs/values.local.json --strict-locators --locator-mode read-only
 ```
 
-The paths above are placeholders. The optional launcher requires a Node runtime with `process.loadEnvFile` and `AbortSignal.any`; direct Java replay/reporting needs no Node process. See [case workflows](docs/CASE_WORKFLOWS.md) for the optional external subscription adapter and explicit AI command setup.
+The paths above are placeholders. The optional launcher requires a Node runtime with `process.loadEnvFile` and `AbortSignal.any`; automatic Allure 3 reporting uses the local Node runtime. See [case workflows](docs/CASE_WORKFLOWS.md) for the optional external subscription adapter and explicit AI command setup.
 
 ### Read the AI metrics correctly
 
@@ -876,7 +858,7 @@ The external-env launcher is optional and accepts any environment path:
 node scripts/run-with-env.mjs --env-file <external-env-file> -- verify-ui --config project.local.yaml --plan mapping.local.json --persona reviewer
 ```
 
-For an existing authorized ChatGPT subscription adapter, pass `--chatgpt-project <external-project-directory>` with `map-ui`, `learn-case` or `discover-ui`. The temporary private loopback bridge reuses its installed provider and shuts down/aborts pending calls with Java. `replay-case` starts no bridge. Normal Java execution needs neither Node nor that external project. Credentials are never copied into the framework.
+For an existing authorized ChatGPT subscription adapter, pass `--chatgpt-project <external-project-directory>` with `map-ui`, `learn-case` or `discover-ui`. The temporary private loopback bridge reuses its installed provider and shuts down/aborts pending calls with Java. `replay-case` starts no bridge. Normal Java execution needs no external subscription project; its automatic Allure 3 reports use the local Node runtime. Credentials are never copied into the framework.
 
 ## Automatic Allure reports and screenshots
 
@@ -923,7 +905,7 @@ evidence:
   piiLabels: []
 ```
 
-The Allure 2.46.1 engine is bundled during the Maven build and cached on first use. Runtime reporting needs Java 21, with no global Allure/Node installation or runtime download. Raw results remain in `allure-results`; `allure-report/index.html` and the root `index.html` contain the same generated report. JSON data, generation logs and integrity metadata remain alongside it.
+The official Allure 3.20.1 engine and its integrity-locked npm dependencies are bundled during the Maven build and cached on first use. Runtime reporting needs Node.js 26.10.0 or later on `PATH`, with no global Allure installation or runtime download. Set the JVM property `-Dsf.e2e.nodeExecutable=<absolute node executable>` to choose a specific Node installation. Raw results remain in `allure-results`; `allure-report/index.html` and the root `index.html` contain the same generated report. JSON data, generation logs and integrity metadata remain alongside it.
 
 ```powershell
 java -jar sf-e2e-cli/target/sf-e2e.jar report verify --run <run-directory>
@@ -959,6 +941,7 @@ For dataset CI, restore reviewed maps/recipes and provision private parameter/se
 | `AI_USAGE_INVALID` | Inspect provider/adapter token accounting; the workflow stopped further dispatch |
 | `AI_WORKFLOW_REJECTED` | Bounded format repair/escalation failed; refine the scope/intent or evaluated model |
 | `MAPPING_BLOCKED` / `CASE_LEARNING_BLOCKED` | AI could not establish the supplied discovery; provide complete scope/intent instead of repeatedly paying for the same blocked request |
+| `REPORT_RUNTIME_UNAVAILABLE` | Install Node.js 26.10.0 or later on `PATH`, or set `-Dsf.e2e.nodeExecutable=<absolute node executable>`; raw results remain available |
 | `REPORT_GENERATION_FAILED` | Inspect the run's `allure-generation.log`; raw results remain available for `report build` |
 
 Change credentials in the external provider, never in saved locator files. Keep reports, session files and local maps out of source control; review artifacts before sharing. Java test code and custom integrations execute with the host user's permissions.
@@ -971,7 +954,7 @@ The framework is org-independent and configured per deployment. Browser automati
 
 No claim is made that every Salesforce edition, app, customization, authentication policy and UI combination has been tested. See [implementation](docs/IMPLEMENTATION.md) and [verification](docs/VERIFICATION.md) for the checks actually performed.
 
-The development implementation passed **272 internal checks in 46 suites**: 225 unit checks and 47 real-browser checks, with zero failures/errors/skips. The latest complete reactor verifies change-impact fallback/closure, parameter/context-separated trends, unknown AI cost, concrete component dispatch and mixed release-layer failures as well as the existing POM/naming and healing boundaries. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** and the English/documentation validators pass. These are implementation receipts, not a hosted CI or universal private-org/device certification badge.
+The development implementation passed **278 internal checks in 47 suites**: 231 unit checks and 47 real-browser checks, with zero failures/errors/skips. The latest complete reactor verifies change-impact fallback/closure, parameter/context-separated trends, unknown AI cost, concrete component dispatch and mixed release-layer failures as well as the existing POM/naming and healing boundaries. The stable-stack migration additionally verifies legacy recipe bytes/checksums, JUnit 6 session cleanup, the bundled Allure 3 version and missing-Node evidence preservation. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** and the English/documentation validators pass. These are implementation receipts, not a hosted CI or universal private-org/device certification badge.
 
 See the [requirement and best-practice audit](docs/REQUIREMENTS.md) for the implementation/evidence behind each requested capability.
 

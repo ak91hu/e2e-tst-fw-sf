@@ -76,13 +76,13 @@ public record CaseRecipe(int schemaVersion,String id,String namespaceHash,String
         if(!Set.of("lookup","download","clickDialog","gridFind","multiSelect").contains(kind)) return;
         try {
             var tree=Json.MAPPER.readTree(value);Failure.require(tree!=null,"CASE_INVALID","Missing structured operation value");
-            if(kind.equals("multiSelect")) {Set<String> labels=new HashSet<>();Failure.require(tree.isArray() && !tree.isEmpty() && tree.size()<=100,"CASE_INVALID","Multi-select needs 1..100 unique labels");for(var item:tree) Failure.require(item.isTextual() && !item.asText().isBlank() && labels.add(item.asText()),"CASE_INVALID","Invalid/duplicate multi-select label");return;}
+            if(kind.equals("multiSelect")) {Set<String> labels=new HashSet<>();Failure.require(tree.isArray() && !tree.isEmpty() && tree.size()<=100,"CASE_INVALID","Multi-select needs 1..100 unique labels");for(var item:tree) Failure.require(item.isString() && !item.asString().isBlank() && labels.add(item.asString()),"CASE_INVALID","Invalid/duplicate multi-select label");return;}
             Set<String> keys=switch(kind) {case "lookup" -> Set.of("query","option");case "download" -> Set.of("sha256","text");case "gridFind" -> Set.of("row","maxScrolls");default -> Set.of("type","message","decision","prompt");};
-            Failure.require(tree.isObject() && tree.size()==keys.size() && keys.stream().allMatch(k -> tree.path(k).isTextual()),"CASE_INVALID","Operation value has unknown/missing keys or wrong types");
-            if(kind.equals("lookup")) Failure.require(!tree.path("option").asText().isBlank(),"CASE_INVALID","Lookup needs an exact option");
-            if(kind.equals("download")) Failure.require(tree.path("sha256").asText().matches("[a-f0-9]{64}"),"CASE_INVALID","Download needs an expected SHA-256");
-            if(kind.equals("gridFind")) Failure.require(!tree.path("row").asText().isBlank() && tree.path("maxScrolls").asText().matches("0|[1-9][0-9]?|100"),"CASE_INVALID","Grid needs an exact row and bounded scroll count");
-            if(kind.equals("clickDialog")) Failure.require(Set.of("alert","confirm","prompt","beforeunload").contains(tree.path("type").asText()) && Set.of("accept","dismiss").contains(tree.path("decision").asText()),"CASE_INVALID","Invalid dialog type/decision");
+            Failure.require(tree.isObject() && tree.size()==keys.size() && keys.stream().allMatch(k -> tree.path(k).isString()),"CASE_INVALID","Operation value has unknown/missing keys or wrong types");
+            if(kind.equals("lookup")) Failure.require(!tree.path("option").asString().isBlank(),"CASE_INVALID","Lookup needs an exact option");
+            if(kind.equals("download")) Failure.require(tree.path("sha256").asString().matches("[a-f0-9]{64}"),"CASE_INVALID","Download needs an expected SHA-256");
+            if(kind.equals("gridFind")) Failure.require(!tree.path("row").asString().isBlank() && tree.path("maxScrolls").asString().matches("0|[1-9][0-9]?|100"),"CASE_INVALID","Grid needs an exact row and bounded scroll count");
+            if(kind.equals("clickDialog")) Failure.require(Set.of("alert","confirm","prompt","beforeunload").contains(tree.path("type").asString()) && Set.of("accept","dismiss").contains(tree.path("decision").asString()),"CASE_INVALID","Invalid dialog type/decision");
         }catch(Failure e) {throw e;}catch(Exception e) {throw new Failure("CASE_INVALID","Operation value is not valid JSON");}
     }
 }

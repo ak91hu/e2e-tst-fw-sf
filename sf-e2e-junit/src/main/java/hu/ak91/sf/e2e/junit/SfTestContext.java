@@ -29,6 +29,7 @@ public final class SfTestContext implements AutoCloseable {
     private Persona persona;
     private ModelClient model;
     private boolean finished;
+    private boolean closed;
     private AttemptResult result;
     public SfTestContext(FrameworkConfig config,String runId,CaseInfo info,Path runRoot) {
         this.config=config;this.runId=runId;this.info=info;persona=info.persona();
@@ -168,5 +169,12 @@ public final class SfTestContext implements AutoCloseable {
         if(e instanceof AssertionError || Set.of("ASSERTION_FAILED","API_ASSERTION_FAILED","FILE_VERIFICATION_FAILED","APPLICATION_DEFECT","QUALITY_GATE_FAILED","UI_ASSERTION_FAILED","VALUE_MISMATCH","AGENT_LOOP_DETECTED","STEP_BUDGET_EXHAUSTED","STEP_TIMEOUT","TEST_TIMEOUT","END_MISMATCH","PROOF_MISSING").contains(code)) return "FAILED";
         return "BLOCKED";
     }
-    @Override public void close() {RuntimeException failure=null;for(var session:sessions.values()) try {session.close();}catch(RuntimeException e) {if(failure==null) failure=e;else failure.addSuppressed(e);}if(failure!=null) throw failure;}
+    @Override public synchronized void close() {
+        // JUnit 6 also closes AutoCloseable values stored in ExtensionContext.Store.
+        // Explicit finalization and automatic fallback cleanup must close each session only once.
+        if(closed) return;closed=true;
+        RuntimeException failure=null;
+        for(var session:sessions.values()) try {session.close();}catch(RuntimeException e) {if(failure==null) failure=e;else failure.addSuppressed(e);}
+        if(failure!=null) throw failure;
+    }
 }

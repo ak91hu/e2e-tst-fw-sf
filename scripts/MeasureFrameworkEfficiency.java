@@ -129,8 +129,8 @@ public class MeasureFrameworkEfficiency {
             if(request.kind().equals("case-target-batch")) {
                 var targets=new ArrayList<Map<String,String>>();
                 for(var intent:Json.MAPPER.valueToTree(request.params().get("targets"))) {
-                    String name=intent.path("instruction").asText();var node=request.observation().nodes().stream().filter(n -> name.equals(n.target().name())).findFirst().orElseThrow();
-                    targets.add(Map.of("id",intent.path("id").asText(),"nodeId",node.id()));
+                    String name=intent.path("instruction").asString();var node=request.observation().nodes().stream().filter(n -> name.equals(n.target().name())).findFirst().orElseThrow();
+                    targets.add(Map.of("id",intent.path("id").asString(),"nodeId",node.id()));
                 }
                 data=Map.of("targets",targets);
             } else {

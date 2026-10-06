@@ -42,7 +42,7 @@ public final class ExternalLayers {
         Json.write(root.resolve("release-report.json"),Map.of("schemaVersion",1,"completedAt",Instant.now(),"status",passed?"PASSED":"FAILED","layers",layers,"modelCalls",0));AllureReports.generate(root);return passed;
     }
     public static List<Layer> read(Path root) {
-        var report=Json.read(root.resolve("release-report.json"),Map.class);var layers=Json.MAPPER.convertValue(report.get("layers"),new com.fasterxml.jackson.core.type.TypeReference<List<Layer>>(){});
+        var report=Json.read(root.resolve("release-report.json"),Map.class);var layers=Json.MAPPER.convertValue(report.get("layers"),new tools.jackson.core.type.TypeReference<List<Layer>>(){});
         Failure.require(((Number)report.getOrDefault("schemaVersion",0)).intValue()==1 && report.get("completedAt")!=null && !layers.isEmpty() && layers.stream().allMatch(l -> !l.tests().isEmpty() && l.status().equals(l.tests().stream().allMatch(t -> t.status().equals("PASSED"))?"PASSED":"FAILED")) && Objects.equals(report.get("status"),layers.stream().allMatch(l -> l.status().equals("PASSED"))?"PASSED":"FAILED"),"REPORT_RUN_MISMATCH","Release report has inconsistent layer verdicts");return layers;
     }
     public static void verify(Path root) { read(root);AllureReports.verify(root); }

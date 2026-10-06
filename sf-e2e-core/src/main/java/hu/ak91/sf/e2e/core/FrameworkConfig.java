@@ -1,8 +1,8 @@
 package hu.ak91.sf.e2e.core;
 
-import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.node.*;
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import tools.jackson.databind.*;
+import tools.jackson.databind.node.*;
+import tools.jackson.dataformat.yaml.YAMLMapper;
 import java.nio.file.*;
 import java.util.*;
 import java.time.*;
@@ -98,7 +98,7 @@ public record FrameworkConfig(int schemaVersion, String projectId, String profil
             ObjectNode tree = (ObjectNode) Json.MAPPER.valueToTree(defaults());
             if (file != null) {
                 Failure.require(Files.isRegularFile(file),"CONFIG_INVALID","Configuration file does not exist: "+file.getFileName());
-                merge(tree, YAMLMapper.builder().enable(com.fasterxml.jackson.dataformat.yaml.YAMLParser.Feature.PARSE_BOOLEAN_LIKE_WORDS_AS_STRINGS).build().readTree(Files.readString(file)));
+                merge(tree, YAMLMapper.builder().build().readTree(Files.readString(file)));
             }
             Map<String,String> env = Map.ofEntries(Map.entry("org.baseUrl","SF_BASE_URL"),Map.entry("profile","E2E_PROFILE"),Map.entry("agent.model","E2E_MODEL"),Map.entry("agent.endpoint","E2E_MODEL_ENDPOINT"),
                 Map.entry("org.alias","SF_ORG_ALIAS"),Map.entry("auth.mode","SF_AUTH_MODE"),Map.entry("auth.audience","SF_JWT_AUDIENCE"),Map.entry("auth.tokenOrigin","SF_TOKEN_ORIGIN"),Map.entry("auth.startRoute","SF_START_ROUTE"),
@@ -116,9 +116,9 @@ public record FrameworkConfig(int schemaVersion, String projectId, String profil
             Path projectRoot=file==null?Path.of("").toAbsolutePath():file.toAbsolutePath().getParent();
             for(String[] path:new String[][]{{"cache","dir"},{"retention","journalDir"},{"report","root"},{"locators","dir"}}) {
                 ObjectNode section=(ObjectNode)tree.get(path[0]);
-                Path resolved=projectRoot.resolve(section.path(path[1]).asText()).normalize();section.put(path[1],resolved.toString());
+                Path resolved=projectRoot.resolve(section.path(path[1]).asString()).normalize();section.put(path[1],resolved.toString());
             }
-            ObjectNode uiTree=(ObjectNode)tree.get("ui");if(!uiTree.path("fileInputRoot").asText().isBlank()) uiTree.put("fileInputRoot",projectRoot.resolve(uiTree.path("fileInputRoot").asText()).normalize().toString());
+            ObjectNode uiTree=(ObjectNode)tree.get("ui");if(!uiTree.path("fileInputRoot").asString().isBlank()) uiTree.put("fileInputRoot",projectRoot.resolve(uiTree.path("fileInputRoot").asString()).normalize().toString());
             FrameworkConfig config = Json.MAPPER.treeToValue(tree, FrameworkConfig.class);
             config.validate(); return config;
         } catch (Failure e) { throw e; }
@@ -126,7 +126,7 @@ public record FrameworkConfig(int schemaVersion, String projectId, String profil
     }
     private static void merge(ObjectNode target, JsonNode source) {
         Failure.require(source != null && source.isObject(), "CONFIG_INVALID", "Configuration must be an object");
-        source.fields().forEachRemaining(e -> {
+        source.properties().forEach(e -> {
             Failure.require(target.has(e.getKey()),"CONFIG_INVALID","Unknown configuration key: " + e.getKey());
             if(e.getKey().equals("personas")) target.set(e.getKey(),e.getValue());
             else if (target.get(e.getKey()).isObject() && e.getValue().isObject()) merge((ObjectNode)target.get(e.getKey()), e.getValue());
@@ -144,12 +144,12 @@ public record FrameworkConfig(int schemaVersion, String projectId, String profil
         if (previous.isBoolean()) { Failure.require(value.equals("true") || value.equals("false"),"CONFIG_INVALID","Invalid boolean: " + key); current.put(last,Boolean.parseBoolean(value)); }
         else if (previous.isIntegralNumber()) current.put(last,Long.parseLong(value));
         else if (previous.isFloatingPointNumber()) current.put(last,Double.parseDouble(value));
-        else { Failure.require(previous.isTextual(),"CONFIG_INVALID","Only scalar overrides supported"); current.put(last,value); }
+        else { Failure.require(previous.isString(),"CONFIG_INVALID","Only scalar overrides supported"); current.put(last,value); }
     }
     private static void substitute(JsonNode node) {
-        if (node.isObject()) node.fields().forEachRemaining(e -> {
-            if (e.getValue().isTextual()) {
-                String value=e.getValue().asText();
+        if (node.isObject()) node.properties().forEach(e -> {
+            if (e.getValue().isString()) {
+                String value=e.getValue().asString();
                 var matcher=java.util.regex.Pattern.compile("\\$\\{([A-Z0-9_]+)}").matcher(value);
                 StringBuilder replaced=new StringBuilder();
                 while(matcher.find()) {
@@ -163,7 +163,7 @@ public record FrameworkConfig(int schemaVersion, String projectId, String profil
         else if(node.isArray()) {
             for(int i=0;i<node.size();i++) {
                 var child=node.get(i);
-                if(child.isTextual()) {
+                if(child.isString()) {
                     var holder=Json.MAPPER.createObjectNode().set("value",child);substitute(holder);
                     ((ArrayNode)node).set(i,holder.get("value"));
                 } else substitute(child);

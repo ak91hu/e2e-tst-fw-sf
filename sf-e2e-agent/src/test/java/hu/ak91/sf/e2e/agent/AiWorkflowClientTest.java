@@ -8,7 +8,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AiWorkflowClientTest {
-    static final com.fasterxml.jackson.databind.JsonNode SCHEMA=Json.MAPPER.valueToTree(Map.of("type","object","required",List.of("nodeId"),"additionalProperties",false,"properties",Map.of("nodeId",Map.of("type","string"))));
+    static final tools.jackson.databind.JsonNode SCHEMA=Json.MAPPER.valueToTree(Map.of("type","object","required",List.of("nodeId"),"additionalProperties",false,"properties",Map.of("nodeId",Map.of("type","string"))));
     ModelClient.Request request(String instruction,String name) {
         var node=new Observation.Node("n1",SemanticTarget.role("textbox",name,"page"),"","",false,false,Map.of("testId","field","frame","main"));
         return new ModelClient.Request("case-target",instruction,Map.of("kind","fill","target",name),new Observation(1,Instant.now(),"https://app.example/form",List.of(node),false,"COMPLETE","SAFE",null),List.of(),SCHEMA);

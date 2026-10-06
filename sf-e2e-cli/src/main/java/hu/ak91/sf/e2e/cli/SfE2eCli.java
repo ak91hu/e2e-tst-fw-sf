@@ -88,7 +88,7 @@ public final class SfE2eCli implements Runnable {
         public Integer call() {
             var config=options.config("checks");
             Failure.require(Runtime.version().feature()>=21,"CONFIG_INVALID","Java 21 or newer is required");
-            System.out.println("Java "+Runtime.version()+"; Maven Wrapper 3.9.9; "+config.ui().browser()+" engine 1.63.0; shadow policy "+config.ui().shadowPolicy());
+            System.out.println("Java "+Runtime.version()+"; Maven Wrapper 3.10.0; "+config.ui().browser()+" engine 1.63.0; shadow policy "+config.ui().shadowPolicy());
             if(!config.profile().equals("checks")) {
                 var plan=options.plan(config);Set<Persona> personas=new HashSet<>();plan.forEach(c -> personas.add(c.info().persona()));
                 if(personas.isEmpty()) personas.add(Persona.DEFAULT);

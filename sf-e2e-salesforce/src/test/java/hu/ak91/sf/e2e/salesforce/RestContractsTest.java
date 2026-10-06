@@ -47,7 +47,7 @@ class RestContractsTest {
     @Test void wrongFieldsAndEventualWrongResultFail() {
         response="{\"Id\":\""+ID+"\"}";assertThrows(Failure.class,() -> api(null).record("Account",ID,List.of("Name"),deadline()));
         response="{\"Id\":\""+ID+"\",\"Name\":\"wrong\"}";
-        assertEquals("API_ASSERTION_FAILED",assertThrows(Failure.class,() -> api(null).awaitRecord("Account",ID,List.of("Name"),r -> r.path("Name").asText().equals("expected"),Duration.ofMillis(10),Deadline.after(Duration.ofMillis(100)))).code());
+        assertEquals("API_ASSERTION_FAILED",assertThrows(Failure.class,() -> api(null).awaitRecord("Account",ID,List.of("Name"),r -> r.path("Name").asString().equals("expected"),Duration.ofMillis(10),Deadline.after(Duration.ofMillis(100)))).code());
     }
     @Test void optionalMetricsCannotChangeVerdict() {
         var sink=new EvidenceSink() { public String checkpoint(String s) { return ""; }public void event(Map<String,Object> e) { assertFalse(Json.string(e).contains("private-token"));throw new IllegalStateException(); } };

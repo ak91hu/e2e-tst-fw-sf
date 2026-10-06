@@ -140,37 +140,37 @@ public final class AiWorkflowClient implements ModelClient {
         JsonSchema.validate(response.data(),request.schema());
         if(request.observation()!=null) {
             Set<String> available=new HashSet<>();request.observation().nodes().forEach(n -> available.add(n.id()));
-            if(response.data().has("nodeId")) Failure.require(available.contains(response.data().get("nodeId").asText()),"MODEL_OUTPUT_INVALID","AI referenced an unavailable node");
+            if(response.data().has("nodeId")) Failure.require(available.contains(response.data().get("nodeId").asString()),"MODEL_OUTPUT_INVALID","AI referenced an unavailable node");
             if(request.kind().equals("map")) {
                 Set<String> seen=new HashSet<>(),keys=new HashSet<>();
-                for(var target:response.data().path("targets")) Failure.require(available.contains(target.path("nodeId").asText()) &&
-                    seen.add(target.path("nodeId").asText()) && keys.add(target.path("key").asText()) && !target.path("key").asText().startsWith("records."),"MODEL_OUTPUT_INVALID","AI mapping is incomplete, duplicate or reserved");
+                for(var target:response.data().path("targets")) Failure.require(available.contains(target.path("nodeId").asString()) &&
+                    seen.add(target.path("nodeId").asString()) && keys.add(target.path("key").asString()) && !target.path("key").asString().startsWith("records."),"MODEL_OUTPUT_INVALID","AI mapping is incomplete, duplicate or reserved");
                 Failure.require(seen.equals(available),"MODEL_OUTPUT_INVALID","AI mapping omitted supplied controls");
             }
         }
         if(request.kind().equals("case-target-batch")) {
-            var manifest=Json.MAPPER.valueToTree(request.params().get("targets"));Map<String,com.fasterxml.jackson.databind.JsonNode> intents=new HashMap<>();
-            for(var target:manifest) intents.put(target.path("id").asText(),target);
+            var manifest=Json.MAPPER.valueToTree(request.params().get("targets"));Map<String,tools.jackson.databind.JsonNode> intents=new HashMap<>();
+            for(var target:manifest) intents.put(target.path("id").asString(),target);
             Set<String> seen=new HashSet<>();
             for(var target:response.data().path("targets")) {
-                String id=target.path("id").asText();Failure.require(intents.containsKey(id) && seen.add(id),"MODEL_OUTPUT_INVALID","Invalid or duplicate batch intent");
+                String id=target.path("id").asString();Failure.require(intents.containsKey(id) && seen.add(id),"MODEL_OUTPUT_INVALID","Invalid or duplicate batch intent");
                 if(!target.path("nodeId").isNull()) {
-                    var node=request.observation().nodes().stream().filter(n -> n.id().equals(target.path("nodeId").asText())).findFirst();
+                    var node=request.observation().nodes().stream().filter(n -> n.id().equals(target.path("nodeId").asString())).findFirst();
                     Failure.require(node.isPresent(),"MODEL_OUTPUT_INVALID","Batch referenced an unavailable node");
-                    for(var kind:intents.get(id).path("kinds")) Failure.require(CaseLearner.permittedRole(kind.asText(),node.get().target().role()),"MODEL_OUTPUT_INVALID","Batch target has the wrong action role");
+                    for(var kind:intents.get(id).path("kinds")) Failure.require(CaseLearner.permittedRole(kind.asString(),node.get().target().role()),"MODEL_OUTPUT_INVALID","Batch target has the wrong action role");
                 }
             }
             Failure.require(seen.equals(intents.keySet()),"MODEL_OUTPUT_INVALID","Batch omitted supplied intent");
         }
         if(request.kind().equals("discover-routes")) {
             var candidates=Json.MAPPER.valueToTree(request.params().get("candidates"));Set<String> allowed=new HashSet<>();
-            for(var candidate:candidates) allowed.add(candidate.isTextual()?candidate.asText():candidate.path("route").asText());
-            for(var route:response.data().path("routes")) Failure.require(allowed.contains(route.asText()),"MODEL_OUTPUT_INVALID","AI invented a navigation route");
+            for(var candidate:candidates) allowed.add(candidate.isString()?candidate.asString():candidate.path("route").asString());
+            for(var route:response.data().path("routes")) Failure.require(allowed.contains(route.asString()),"MODEL_OUTPUT_INVALID","AI invented a navigation route");
         }
     }
     private static String key(Request request) {
         var tree=Json.MAPPER.valueToTree(request);
-        if(tree.path("observation").isObject()) { var observation=(com.fasterxml.jackson.databind.node.ObjectNode)tree.get("observation");observation.remove(List.of("revision","capturedAt")); }
+        if(tree.path("observation").isObject()) { var observation=(tools.jackson.databind.node.ObjectNode)tree.get("observation");observation.remove(List.of("revision","capturedAt")); }
         return Json.hash(tree);
     }
     private static Response copy(Response response) { return Json.MAPPER.convertValue(Json.MAPPER.valueToTree(response),Response.class); }

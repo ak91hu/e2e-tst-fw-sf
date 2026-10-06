@@ -35,7 +35,7 @@ public final class AllureResults {
                 var node=Json.MAPPER.valueToTree(event);var definitions=kind.equals("case-plan-ready")?node.path("plan").path("steps"):node.path("steps");
                 int index=0;
                 for(var definition:definitions) {
-                    String label=definition.path("kind").asText()+" "+definition.path("instruction").asText(definition.path("key").asText(definition.path("route").asText("")));
+                    String label=definition.path("kind").asString()+" "+definition.path("instruction").asString(definition.path("key").asString(definition.path("route").asString("")));
                     var step=step((++index)+". "+label.trim(),"skipped",0);planned.put(index,step);result.add(step);
                 }
                 continue;

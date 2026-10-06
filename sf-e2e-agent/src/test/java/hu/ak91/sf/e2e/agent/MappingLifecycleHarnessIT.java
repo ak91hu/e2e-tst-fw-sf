@@ -33,16 +33,16 @@ class MappingLifecycleHarnessIT {
             calls.incrementAndGet();
             try {
                 var body=Json.MAPPER.readTree(exchange.getRequestBody().readAllBytes());
-                var request=Json.MAPPER.readTree(body.path("messages").path(1).path("content").asText());
+                var request=Json.MAPPER.readTree(body.path("messages").path(1).path("content").asString());
                 var targets=new ArrayList<Map<String,String>>();
                 for(var node:request.path("observation").path("nodes")) {
-                    String key=switch(node.path("target").path("role").asText()) {
+                    String key=switch(node.path("target").path("role").asString()) {
                         case "textbox" -> "details.field";
                         case "button" -> "details.continue";
                         case "status" -> "details.result";
                         default -> throw new IllegalStateException("Unexpected projected control");
                     };
-                    targets.add(Map.of("key",key,"nodeId",node.path("id").asText()));
+                    targets.add(Map.of("key",key,"nodeId",node.path("id").asString()));
                 }
                 var completion=Map.of("tool","finish","verdict","PASSED","reason","Current controls mapped",
                     "evidenceRefs",List.of(),"data",Map.of("targets",targets));

@@ -1,6 +1,6 @@
 package hu.ak91.sf.e2e.agent;
 import hu.ak91.sf.e2e.core.*;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.util.*;
 public interface ModelClient {
     record Request(String kind,String instruction,Map<String,Object> params,Observation observation,
