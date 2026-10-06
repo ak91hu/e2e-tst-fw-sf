@@ -1,0 +1,20 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>hu.ak91.sf.e2e</groupId><artifactId>sf-agentic-e2e</artifactId><version>1.0.0-SNAPSHOT</version></parent>
+  <artifactId>sf-e2e-reporting</artifactId>
+  <properties><allure.commandline.version>2.46.1</allure.commandline.version></properties>
+  <dependencies>
+    <dependency><groupId>hu.ak91.sf.e2e</groupId><artifactId>sf-e2e-core</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>hu.ak91.sf.e2e</groupId><artifactId>sf-e2e-salesforce</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+  </dependencies>
+  <build><plugins><plugin>
+    <groupId>org.apache.maven.plugins</groupId><artifactId>maven-dependency-plugin</artifactId><version>3.8.1</version>
+    <executions><execution><id>bundle-allure-report-engine</id><phase>generate-resources</phase><goals><goal>copy</goal></goals>
+      <configuration><artifactItems><artifactItem>
+        <groupId>io.qameta.allure</groupId><artifactId>allure-commandline</artifactId><version>${allure.commandline.version}</version><type>zip</type>
+        <outputDirectory>${project.build.outputDirectory}/allure-engine</outputDirectory><destFileName>allure-commandline.zip</destFileName>
+      </artifactItem></artifactItems></configuration>
+    </execution></executions>
+  </plugin></plugins></build>
+</project>

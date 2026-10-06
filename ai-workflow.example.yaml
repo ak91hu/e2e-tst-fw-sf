@@ -1,0 +1,36 @@
+# Copy into a private project config and add the authorized target/session settings.
+# Monetary rates below are illustrative, not current provider prices.
+schemaVersion: 1
+profile: mapping
+agent:
+  model: ${E2E_MODEL}
+  endpoint: https://api.openai.com/v1/chat/completions
+  apiKeyRef: E2E_MODEL_API_KEY
+  maxActions: 40
+  maxModelCalls: 12
+  maxTokens: 100000
+  actTimeoutSeconds: 120
+  workflow:
+    reuseReadOnlyResponses: true
+    # Disable individually when evaluating a provider/model against the baseline.
+    compactRequests: true
+    adaptiveOutputLimits: true
+    batchCaseTargets: true
+    maxTargetsPerBatch: 8
+    maxInputBytes: 131072
+    maxOutputTokens: 4096
+    outputTokenParameter: max_completion_tokens
+    maxProtocolRetries: 1
+    maxEscalations: 0
+    maxCostUsd: 0.25
+    inputUsdPerMillionTokens: 1.00
+    outputUsdPerMillionTokens: 5.00
+    escalation: null
+# Opt-in escalation example; replace model/endpoint/rates after evaluation:
+#    maxEscalations: 1
+#    escalation:
+#      endpoint: https://api.openai.com/v1/chat/completions
+#      model: YOUR_EVALUATED_STRONGER_MODEL
+#      apiKeyRef: E2E_STRONG_MODEL_API_KEY
+#      inputUsdPerMillionTokens: 3.00
+#      outputUsdPerMillionTokens: 15.00

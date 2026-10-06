@@ -1,0 +1,83 @@
+schemaVersion: 1
+projectId: salesforce-ui-framework
+profile: deterministic
+org:
+  alias: default
+  environmentType: auto
+  uiProfileVersion: 1
+auth:
+  mode: jwt
+  startRoute: /lightning/page/home
+personas:
+  default:
+    usernameRef: SF_USERNAME
+    storageStateRef: SF_STORAGE_STATE_FILE
+ui:
+  browser: chromium
+  shadowPolicy: cdp
+  # Opt in to upload/download by supplying a private, reviewed input directory.
+  fileInputRoot: ""
+  # Empty settings inherit the browser runtime; no language or currency gate.
+  language: ""
+  locale: ""
+  currency: ""
+  personaTimeZone: ""
+execution:
+  workers: 1
+  retries: 0
+  testTimeoutSeconds: 600
+  actionTimeoutSeconds: 45
+  assertionTimeoutSeconds: 30
+agent:
+  # These controls apply only when AI discovery/learning is explicitly requested.
+  workflow:
+    reuseReadOnlyResponses: true
+    compactRequests: true
+    adaptiveOutputLimits: true
+    batchCaseTargets: true
+    maxTargetsPerBatch: 8
+    maxInputBytes: 131072
+    maxOutputTokens: 4096
+    outputTokenParameter: max_completion_tokens
+    maxProtocolRetries: 1
+    maxEscalations: 0
+    # Enable an estimated USD ceiling only with reviewed input/output rates.
+    maxCostUsd: 0
+    inputUsdPerMillionTokens: null
+    outputUsdPerMillionTokens: null
+    escalation: null
+locators:
+  dir: .sf-e2e/locators
+  healing: true
+  strict: false
+  aiFallback: false
+  retries: 3
+  retryDelayMillis: 250
+  timeoutSeconds: 30
+  minConfidence: 0.90
+  minMargin: 0.10
+# Locator mode defaults to read-write locally and read-only in CI.
+cache:
+  mode: off
+  strict: false
+retention:
+  records: permanent
+  journalDir: .sf-e2e-data
+evidence:
+  minPngPerPassedResult: 2
+  screenshotsAfterSteps: true
+  privateTraceOnFailure: false
+  privateRetentionHours: 24
+report:
+  # Each run reserves a precise UTC timestamp directory below this folder.
+  root: report
+quality:
+  failOnPageErrors: true
+  failOnConsoleErrors: true
+  failOnHttpServerErrors: true
+  failOnRequestFailures: true
+  maxBrowserIssues: 200
+  # -1 permits bounded locator healing/retries while reporting every event.
+  maxHealingEvents: -1
+  maxLocatorRetries: -1
+  waivers: []
