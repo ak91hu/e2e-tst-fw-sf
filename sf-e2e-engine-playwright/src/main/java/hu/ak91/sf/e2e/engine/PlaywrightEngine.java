@@ -2,6 +2,8 @@ package hu.ak91.sf.e2e.engine;
 
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.*;
+import com.microsoft.playwright.assertions.LocatorAssertions;
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import hu.ak91.sf.e2e.core.*;
 import hu.ak91.sf.e2e.core.quality.BrowserQuality;
 import java.io.*;
@@ -29,6 +31,7 @@ public final class PlaywrightEngine implements UiEngine {
         private final String browserName;
         private final boolean headed;
         private int leases;
+        private boolean closed;
         public WorkerRuntime(FrameworkConfig config) {
             Failure.require(WORKER.get()==null,"ENGINE_THREAD_VIOLATION","Worker runtime scopes cannot nest");
             browserName=config.ui().browser();headed=config.execution().headed();playwright=Playwright.create(new Playwright.CreateOptions().setEnv(Map.of("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD","1")));
@@ -36,7 +39,10 @@ public final class PlaywrightEngine implements UiEngine {
             catch(RuntimeException e) { playwright.close();throw new Failure("ENVIRONMENT_UNAVAILABLE","Worker browser could not start"); }
         }
         public void close() {
-            Failure.require(owner==Thread.currentThread() && leases==0,"ENGINE_THREAD_VIOLATION","Close all contexts on the worker thread before its runtime");WORKER.remove();try { browser.close(); } finally { playwright.close(); }
+            Failure.require(owner==Thread.currentThread(),"ENGINE_THREAD_VIOLATION","Close runtime on its owner thread");
+            if(closed) return;
+            Failure.require(leases==0 && WORKER.get()==this,"ENGINE_THREAD_VIOLATION","Close all contexts on the worker thread before its runtime");
+            closed=true;WORKER.remove();try { browser.close(); } finally { playwright.close(); }
         }
     }
     private static BrowserType browserType(Playwright runtime,String name) { return switch(name) { case "firefox" -> runtime.firefox();case "webkit" -> runtime.webkit();default -> runtime.chromium(); }; }
@@ -73,6 +79,7 @@ public final class PlaywrightEngine implements UiEngine {
         WorkerRuntime worker=WORKER.get();borrowedRuntime=worker!=null;
         if(worker!=null) Failure.require(worker.browserName.equals(config.ui().browser()) && worker.headed==config.execution().headed(),"CONFIG_INVALID","Worker browser options cannot change between datasets");
         playwright=borrowedRuntime?worker.playwright:Playwright.create(new Playwright.CreateOptions().setEnv(Map.of("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD","1")));
+        BrowserContext createdContext=null;
         try {
             if(!borrowedRuntime) registerSelectors(playwright);
             browser=borrowedRuntime?worker.browser:browserType(playwright,config.ui().browser()).launch(new BrowserType.LaunchOptions().setHeadless(!config.execution().headed()).setTimeout(deadline.millis(Duration.ofSeconds(90))));
@@ -80,7 +87,7 @@ public final class PlaywrightEngine implements UiEngine {
             if(!config.ui().locale().isBlank()) options.setLocale(config.ui().locale());
             if(!config.ui().personaTimeZone().isBlank()) options.setTimezoneId(config.ui().personaTimeZone());
             if(config.auth().mode().equals("storage-state")) { Failure.require(storageState!=null,"AUTH_CREDENTIAL_UNAVAILABLE","Authenticated browser state is required");options.setStorageState(storageState); }
-            context=browser.newContext(options);
+            context=createdContext=browser.newContext(options);
             context.addInitScript(SCRIPT);
             context.onPage(this::monitorPage);
             context.onResponse(response -> { if(response.status()>=500 && response.status()<=599) recordIssue("HTTP_SERVER_ERROR",response.url(),"HTTP "+response.status(),response.status()); });
@@ -89,8 +96,13 @@ public final class PlaywrightEngine implements UiEngine {
             domInspector=config.ui().shadowPolicy().equals("cdp")?context.newCDPSession(page):null;
             pageHandles.put("main",page);
             if(borrowedRuntime) worker.leases++;
-        } catch(Failure e) { if(!borrowedRuntime) playwright.close();throw e; }
-        catch (RuntimeException e) { if(!borrowedRuntime) playwright.close(); throw new Failure("ENVIRONMENT_UNAVAILABLE","Configured browser/context launch failed; install its Playwright browser"); }
+        } catch(RuntimeException e) {
+            // A borrowed browser outlives a failed lease, so its partially created context must be closed explicitly.
+            if(createdContext!=null) try { createdContext.close(); } catch(RuntimeException cleanup) { e.addSuppressed(cleanup); }
+            if(!borrowedRuntime) try { playwright.close(); } catch(RuntimeException cleanup) { e.addSuppressed(cleanup); }
+            if(e instanceof Failure failure) throw failure;
+            throw new Failure("ENVIRONMENT_UNAVAILABLE","Configured browser/context launch failed; install its Playwright browser");
+        }
     }
     private static String resource(String name) {
         try(var input=PlaywrightEngine.class.getResourceAsStream(name)) {
@@ -128,7 +140,10 @@ public final class PlaywrightEngine implements UiEngine {
         Failure.require(Thread.currentThread()==owner,"ENGINE_THREAD_VIOLATION","Playwright must execute on its owner thread");
         Failure.require(!closed,"ENGINE_FAILURE","Engine is closed"); deadline.check(); attemptDeadline.check();
     }
-    private double timeout(Deadline deadline) { return deadline.millis(Duration.ofSeconds(config.execution().actionTimeoutSeconds())); }
+    private double timeout(Deadline deadline) {
+        var cap=Duration.ofSeconds(config.execution().actionTimeoutSeconds());
+        return Math.min(deadline.millis(cap),attemptDeadline.millis(cap));
+    }
     private void allowed(String url) {
         URI uri=URI.create(url);
         String origin=uri.getScheme()+"://"+uri.getRawAuthority();
@@ -287,7 +302,24 @@ public final class PlaywrightEngine implements UiEngine {
                     var wait=deadline.child(Duration.ofSeconds(config.execution().actionTimeoutSeconds()));var all=picklistOptions(frames.get(action.nodeId()),target,null);target.click(new Locator.ClickOptions().setTimeout(timeout(wait)));
                     try { page.waitForCondition(() -> all.count()>0,new Page.WaitForConditionOptions().setTimeout(timeout(wait))); } catch(TimeoutError e) { throw new Failure("TARGET_NOT_FOUND","Multi-select options did not appear"); }
                     for(String label:unique) Failure.require(picklistOptions(frames.get(action.nodeId()),target,label).count()==1,"TARGET_AMBIGUOUS","A multi-select label is absent or ambiguous");
-                    int count=all.count();for(int i=0;i<count;i++) { Locator option=all.nth(i);String selected=option.getAttribute("aria-selected"),label=option.getAttribute("aria-label");if(label==null) label=option.textContent().trim();Failure.require(Set.of("true","false").contains(Objects.toString(selected,"")),"AUTOMATION_UNSUPPORTED","Multi-select options require explicit selected state");String size=option.getAttribute("aria-setsize");Failure.require(size==null || size.equals(Integer.toString(count)),"AUTOMATION_UNSUPPORTED","Virtualized multi-select cannot establish the complete selected set");boolean wanted=unique.contains(label);if(wanted!=selected.equals("true")) {option.click(new Locator.ClickOptions().setTimeout(timeout(wait)));Failure.require(Boolean.toString(wanted).equals(option.getAttribute("aria-selected")),"ASSERTION_FAILED","Multi-select choice did not persist");} }
+                    // Validate the complete visible option set before changing any selection.
+                    int count=all.count();Set<String> labels=new LinkedHashSet<>();
+                    for(int i=0;i<count;i++) {
+                        Locator option=all.nth(i);String label=optionLabel(option);
+                        Failure.require(labels.add(label),"TARGET_AMBIGUOUS","Multi-select option labels are ambiguous");
+                        Failure.require(Set.of("true","false").contains(Objects.toString(option.getAttribute("aria-selected"),"")),"AUTOMATION_UNSUPPORTED","Multi-select options require explicit selected state");
+                        String size=option.getAttribute("aria-setsize");Failure.require(size==null || size.equals(Integer.toString(count)),"AUTOMATION_UNSUPPORTED","Virtualized multi-select cannot establish the complete selected set");
+                    }
+                    for(String label:labels) {
+                        Locator option=picklistOptions(frames.get(action.nodeId()),target,label);
+                        Failure.require(option.count()==1,"TARGET_AMBIGUOUS","Multi-select option disappeared or became ambiguous");
+                        boolean wanted=unique.contains(label);
+                        if(!Boolean.toString(wanted).equals(option.getAttribute("aria-selected"))) {
+                            option.click(new Locator.ClickOptions().setTimeout(timeout(wait)));
+                            try { assertThat(option).hasAttribute("aria-selected",Boolean.toString(wanted),new LocatorAssertions.HasAttributeOptions().setTimeout(timeout(wait))); }
+                            catch(AssertionError mismatch) { throw new Failure("ASSERTION_FAILED","Multi-select choice did not persist within its deadline"); }
+                        }
+                    }
                     Set<String> seen=new HashSet<>(),selectedNow=new HashSet<>();for(int i=0;i<all.count();i++) {Locator option=all.nth(i);String label=option.getAttribute("aria-label");if(label==null) label=option.textContent().trim();Failure.require(seen.add(label),"TARGET_AMBIGUOUS","Multi-select option labels became ambiguous");if("true".equals(option.getAttribute("aria-selected"))) selectedNow.add(label);}Failure.require(selectedNow.equals(unique),"ASSERTION_FAILED","Final multi-select state differs from the complete supplied choice set");
                 }
             }
@@ -404,6 +436,9 @@ public final class PlaywrightEngine implements UiEngine {
         String id=(String)control.evaluate("e => [...window.__sfE2e.state.nodes].find(([id,node])=>node===e)?.[0]");
         var params=new LinkedHashMap<String,Object>();params.put("control",id);params.put("label",value);
         return frame.locator("sfoption="+Base64.getEncoder().encodeToString(Json.string(params).getBytes(StandardCharsets.UTF_8)));
+    }
+    private static String optionLabel(Locator option) {
+        String label=option.getAttribute("aria-label");return label==null?option.textContent().trim():label;
     }
     /** Deterministic component adapter; consumers still have no raw Page access. */
     public void action(String kind,SemanticTarget target,String value,Deadline deadline) {

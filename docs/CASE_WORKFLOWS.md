@@ -1,6 +1,19 @@
 # Learn once, replay without a model
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 The consumer workspace stays empty. Supply your own case as JSON or UTF-8 text, or ask for bounded read-only discovery. The CLI creates a private executable JSON recipe; no generated Java classes, test-module changes or recompilation are required. Configure the target and authentication as described in the [README](../README.md).
+
+## Contents
+
+- [Three commands](#three-commands)
+- [A supplied structured case](#a-supplied-structured-case)
+- [A supplied text case](#a-supplied-text-case)
+- [Autonomous UI discovery](#autonomous-ui-discovery)
+- [Supported steps](#supported-steps)
+- [Persistence, healing and evidence](#persistence-healing-and-evidence)
+- [Dataset suites and quality gates](#dataset-suites-and-quality-gates)
+- [Existing external environment / subscription](#existing-external-environment-subscription)
 
 ## Three commands
 

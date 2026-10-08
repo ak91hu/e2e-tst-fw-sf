@@ -1,5 +1,7 @@
 # Development implementation ledger
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 All ten tracks in [the capability review](SALESFORCE_CAPABILITY_REVIEW.md) now have checked-in executable implementations and internal acceptance evidence. Consumer business cases remain empty. A shipped API/adapter is not private Salesforce org/device certification; its precise contracts are in the [advanced guide](ADVANCED_CAPABILITIES.md).
 
 | Track | Shipped implementation | Acceptance evidence | Adoption boundary |

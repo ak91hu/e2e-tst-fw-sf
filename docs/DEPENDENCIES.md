@@ -1,5 +1,7 @@
 # Stable tooling snapshot
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 The direct stack was checked against Maven Central, npm and official GitHub releases on **October 6, 2026**. Versions are exact and reproducible; prerelease versions are not selected as framework dependencies. Upstream transitive dependencies are resolved using their supported constraints and the committed npm integrity lockfile, rather than arbitrary major-version overrides.
 
 | Component | Stable version | Source |
@@ -29,6 +31,12 @@ The direct stack was checked against Maven Central, npm and official GitHub rele
 | actions/setup-java | 6.0.1 | Official GitHub release; full commit SHA pinned in both workflows |
 | actions/setup-node | 7.0.0 | Official GitHub release; full commit SHA pinned in both workflows |
 | actions/upload-artifact | 7.0.1 | Official GitHub release; full commit SHA pinned in both workflows |
+
+## Contents
+
+- [Allure 3 build and runtime](#allure-3-build-and-runtime)
+- [Jackson 3 compatibility](#jackson-3-compatibility)
+- [JUnit 6 lifecycle compatibility](#junit-6-lifecycle-compatibility)
 
 ## Allure 3 build and runtime
 

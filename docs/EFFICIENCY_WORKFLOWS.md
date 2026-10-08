@@ -1,6 +1,15 @@
 # Change selection, run trends and LWC component checks
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 These three workflows reduce unnecessary browser work and make execution cost visible while retaining independent assertions, Page Object Model, `TST_` generated names, timestamped Allure and default masked browser screenshots. They require no model calls. The consumer workspace remains empty: coverage manifests, source projects and business checks belong to the target project.
+
+## Contents
+
+- [1. Reviewed change-impact selection](#1-reviewed-change-impact-selection)
+- [2. Automatic, context-separated trends](#2-automatic-context-separated-trends)
+- [3. Concrete LWC/Jest component runner](#3-concrete-lwcjest-component-runner)
+- [Verification and practical limits](#verification-and-practical-limits)
 
 ## 1. Reviewed change-impact selection
 

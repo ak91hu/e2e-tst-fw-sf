@@ -1,6 +1,16 @@
 # Test structure and execution review
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 Reviewed and corrected on October 5, 2026. All four findings below have been addressed. No consumer business cases were added. Original audit evidence is retained below as historical context; current verification is recorded in [VERIFICATION.md](VERIFICATION.md).
+
+## Contents
+
+- [Implemented corrections](#implemented-corrections)
+- [Original assessment (before correction)](#original-assessment-before-correction)
+- [Original findings, in priority order (resolved)](#original-findings-in-priority-order-resolved)
+- [Original coverage gaps](#original-coverage-gaps)
+- [Current execution contract](#current-execution-contract)
 
 ## Implemented corrections
 
@@ -17,7 +27,7 @@ Cross-class dependencies must permit contiguous class execution. The planner rej
 
 The new lifecycle regressions use the actual coordinator and extension with a package-private engine/context factory, valid PNG evidence and isolated journals. No Salesforce authentication/model is used. Report integrity additionally distinguishes a disabled unstarted case from a started attempt that must retain its journal.
 
-Verification of the four corrections: **118 checks in 17 suites**, zero failures/errors/skips, successful shaded CLI build. Subsequent recipe/Allure/timestamp work raised the inventory to 150 checks; browser quality gates, stronger assertions, dataset suites and completion-audit regressions now bring it to **176 checks in 29 suites**. See [current verification](VERIFICATION.md). The consumer workspace/default CLI case list remain empty.
+Historical verification of the four corrections passed **118 checks in 17 suites**, zero failures/errors/skips, with a successful shaded CLI build. Later recipe/Allure/timestamp work raised that inventory to 150 checks; the subsequent browser quality/assertion/dataset completion audit recorded **176 checks in 29 suites**. These are dated milestones, not the current total; see [current verification](VERIFICATION.md). The consumer workspace/default CLI case list remain empty.
 
 ## Original assessment (before correction)
 

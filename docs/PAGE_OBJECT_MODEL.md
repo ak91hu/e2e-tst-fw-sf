@@ -1,6 +1,15 @@
 # Default Page Object Model and TST_ names
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 Page Object Model (POM) is the default execution architecture for supplied-case learning, autonomous discovery and saved-recipe replay. There is no opt-in flag. Java consumers use `SfTestContext.page(id)`/`pages()` and can compose typed project-owned page/component APIs over them. The consumer test module remains empty.
+
+## Contents
+
+- [Architecture and persistence](#architecture-and-persistence)
+- [Java page composition](#java-page-composition)
+- [Naming policy](#naming-policy)
+- [Further efficiency opportunities](#further-efficiency-opportunities)
 
 ## Architecture and persistence
 

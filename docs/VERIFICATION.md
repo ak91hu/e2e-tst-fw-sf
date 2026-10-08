@@ -1,12 +1,41 @@
 # General-framework verification
 
-The latest stable-stack audit ran on Windows on October 6, 2026 with Temurin 27+35, Maven Wrapper distribution 3.10.0, JUnit 6.1.3, Jackson 3.2.3, Allure 3.20.1 and Node.js 26.10.0 / npm 12.2.0. Playwright 1.63.0 exercises real Chromium, Firefox and WebKit. Java 21 remains the bytecode baseline; the packaged CLI doctor and report-integrity commands were also checked on Java 21.0.12.1. See [dependency snapshot](DEPENDENCIES.md). These are implementation checks, not bundled Salesforce business cases or actual mobile-device certification.
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
+## Contents
+
+- [October 8 agent documentation review](#october-8-agent-documentation-review)
+- [October 8 reliability review](#october-8-reliability-review)
+- [October 6 stable-stack audit](#october-6-stable-stack-audit)
+- [Completion audit](#completion-audit)
+- [What the evidence does and does not establish](#what-the-evidence-does-and-does-not-establish)
+- [Live org validation](#live-org-validation)
+
+## October 8 agent documentation review
+
+The documentation follow-up adds [agent instructions](../AGENTS.md), a [task-oriented index](README.md) and a [development guide](DEVELOPMENT.md), plus navigation and contents in existing guides. It clarifies the empty consumer-workspace policy, current-versus-historical evidence, build/runtime profiles, tool prerequisites and verification scope. The README now cites the recorded 293-check inventory and consistently distinguishes the checked JDK 27 build from the Java 21 baseline.
+
+The language/local-link validator passes with expanded coverage of root agent guidance and module READMEs. Independent source-map checks confirm all 57 listed production classes and 43 named regression suites exist; consumer Java case count remains zero. Negative fixture probes confirm broken links in both root `AGENTS.md` and a module README are rejected. Optional local source/receipt: `.tools/VerifyAgentDocumentation.mjs` and `.tools/agent-docs-source-map.json`.
+
+The documented focused command `mvnw.cmd -B -ntp -pl sf-e2e-core -am test "-Dtest=UiReadinessTest" "-Dsurefire.failIfNoSpecifiedTests=false"` ran six checks successfully, without failures/errors/skips. The packaged Java 21 CLI also passed `--help`, `doctor --profile checks` and `list --json`, returning the empty case list. Receipt: `.tools/agent-docs-focused-command.log`. This verifies documentation examples and navigation; the complete Java/browser reactor was not rerun for the documentation follow-up. Its earlier full receipt is retained below.
+
+## October 8 reliability review
+
+The full Windows reactor passed `mvnw.cmd -B -ntp verify -Pchecks` with **293 checks in 49 suites: 237 unit/component checks and 56 real-browser checks**, zero failures/errors/skips. This adds six readiness checks and nine browser checks to the October 6 inventory. All ten Node adapter/collector/budget checks also pass; documentation validation passes for 121 files and 159 local links. The full reactor, including the shaded CLI, completed successfully in 5 minutes 27 seconds on Temurin 27+35 with the existing pinned stack.
+
+The freshly packaged CLI also passed a Java 21.0.12.1 real-Chromium smoke check for readiness serialization, asynchronous multi-select with exactly one click, repeated engine closure and repeated worker-runtime closure. Source and receipt: `.tools/ReliabilityJava21Smoke.java` and `.tools/reliability-java21.log`.
+
+[The reliability review](RELIABILITY_REVIEW.md) maps the official sources, reproduced defects and corrected behaviors. Baseline fault probes failed before correction; the full final run verifies changing UI business state, asynchronous single-dispatch selection on Chromium/Firefox/WebKit, rejection before selection mutation, failed-context cleanup, repeated runtime closure, active-lease guards and attempt-budget enforcement. Logs and computed inventory: `.tools/reliability-before.log`, `.tools/reliability-browser-before.log`, `.tools/reliability-focused.log`, `.tools/reliability-full.log`, `.tools/reliability-inventory.json` and `.tools/reliability-summary.json`. Consumer business cases remain empty; browser checks run against local fixtures.
+
+## October 6 stable-stack audit
+
+The stable-stack audit ran on Windows on October 6, 2026 with Temurin 27+35, Maven Wrapper distribution 3.10.0, JUnit 6.1.3, Jackson 3.2.3, Allure 3.20.1 and Node.js 26.10.0 / npm 12.2.0. Playwright 1.63.0 exercises real Chromium, Firefox and WebKit. Java 21 remains the bytecode baseline; the packaged CLI doctor and report-integrity commands were also checked on Java 21.0.12.1. See [dependency snapshot](DEPENDENCIES.md). These are implementation checks, not bundled Salesforce business cases or actual mobile-device certification.
 
 ```powershell
 .\mvnw.cmd -B -ntp verify -Pchecks
 ```
 
-Current inventory: **278 checks in 47 suites**, zero failures/errors/skips: **231 unit checks and 47 real-browser checks**, including three-engine execution. All 10 Node adapter/collector/budget checks pass. The consumer workspace remains empty. The final reactor log is `.tools/upgrade-final-checks.log`; inventory and receipts are `.tools/upgrade-check-inventory.json`, `.tools/upgrade-summary.json` and `.tools/upgrade-node-checks.log`.
+October 6 inventory: **278 checks in 47 suites**, zero failures/errors/skips: **231 unit checks and 47 real-browser checks**, including three-engine execution. All 10 Node adapter/collector/budget checks pass. The consumer workspace remains empty. The final reactor log is `.tools/upgrade-final-checks.log`; inventory and receipts are `.tools/upgrade-check-inventory.json`, `.tools/upgrade-summary.json` and `.tools/upgrade-node-checks.log`.
 
 The migration checks load a recipe produced by the previously published Jackson 2 CLI and assert its exact bytes/checksum after Jackson 3 serialization. They preserve ISO timestamps, map ordering, optional primitive defaults and strict unknown-key handling. The complete lifecycle regression caught JUnit 6 automatically closing the stored context after explicit finalization; idempotent context cleanup fixes the duplicate closure without changing teardown/dependency ordering. The final dependency-chain and repeat-close checks both pass. Allure checks verify the real bundled version, automatic images, step verdicts, tamper rejection, safe temporary cleanup and raw-evidence preservation when Node is missing.
 
@@ -91,6 +120,8 @@ English vocabulary/fences/local links/anchors pass the repeatable checker; human
 
 ## Completion audit
 
+The following completion receipts describe earlier implementation milestones. Their check counts and runtime versions are historical; the latest recorded inventory is the dated review at the top of this document. Ignored receipt paths are optional local evidence and may be absent from a fresh checkout.
+
 The later cost/quality audit integrates the workflow into all default AI entry points while leaving saved-recipe execution provider-free. Local HTTP fixtures verify output/usage protocol; the browser comparison demonstrates one saved discovery call without changing the oracle. The same recipe passes in a fresh provider-free browser and fails a wrong expectation. Budget and protocol tests deliberately inject unknown/failed/invalid usage and invalid targets. No paid-provider performance/price claim or additional live-org AI benchmark is made. The new English policy example is parsed and validated against the packaged runtime with a placeholder evaluated-model ID.
 
 Packaged checks passed in `.tools/ai-workflow-config-check.log`, `.tools/ai-workflow-doctor.log` and `.tools/quality-doc-examples.log`; empty cases/maps remain `[]`/`{}`. The final artifact rebuilt the retained two-row live report and verified its Allure/evidence integrity using the new quality aggregation: zero provider calls, zero estimated AI spend and both assertions retained. This is offline backward-compatibility evidence, not a new live org execution. Logs are `.tools/ai-workflow-report-rebuild.log` and `.tools/ai-workflow-report-verify.log`.
@@ -115,6 +146,8 @@ The final packaged CLI also rebuilt and verified the retained live suite with th
 Production/sandbox/scratch/government/custom-domain settings are accepted and validated as configuration. Local Chromium checks exercise localized HTML and application routes shaped like Classic/Experience; they are not live tests against every Salesforce edition or UI implementation. Authentication capabilities and required authorization/session setup are documented in the README.
 
 ## Live org validation
+
+This section retains historical observations from separately authorized private target configurations. The corresponding inputs/maps/recipes remain ignored local receipts, not bundled test cases or prerequisites for framework maintenance. Reproduce framework acceptance with the credential-free commands in [the development guide](DEVELOPMENT.md#verification-commands); live compatibility must be established by the consuming project for its own target.
 
 The October 6 quality audit ran two instances of the existing read-only heading recipe through `run-suite`, each in a fresh authenticated browser, with default browser-defect gates, strict locators and read-only storage. Both passed with **zero model calls, two recorded assertions and six masked PNGs**, with no browser issues or locator healing. Four bounded `TARGET_NOT_FOUND` locator retries were recorded across the two rows before the stored target became available; strict execution used the stored locator throughout. One combined Allure report was generated under `report/2026-10-06_10-08-29.261277700Z`. Suite integrity verification, offline report rebuilding and subsequent verification passed. Chromium opened the standalone HTML, selected a dataset and displayed its embedded browser-diagnostics/quality-gate attachment with zero page errors. Target-specific inputs/maps/journals remain private in `.reference/case-workflows-20261006`; no business records were changed. Evidence includes `quality-suite-live.log`, `quality-suite-rebuild.log`, `quality-allure-ui-check.log`, `quality-allure-preview.png`, the aggregate/child reports, quality summaries and retained attempts. This proves live presence-check dataset execution; application defect sensitivity is established by the deliberate isolated fault harnesses.
 

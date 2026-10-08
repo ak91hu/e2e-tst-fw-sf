@@ -1,6 +1,20 @@
 # Backend, execution and quality capabilities
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 These opt-in capabilities implement the ten development tracks in [the implementation ledger](ROADMAP_IMPLEMENTATION.md). They extend the generic framework; object names, records, application flows, expected values, tools and target coverage remain consumer inputs. There are no shipped Salesforce business cases.
+
+## Contents
+
+- [REST oracle and metadata regression](#rest-oracle-and-metadata-regression)
+- [Owned API fixtures](#owned-api-fixtures)
+- [Isolated workers and browser reuse](#isolated-workers-and-browser-reuse)
+- [Files, pages, dialogs and widgets](#files-pages-dialogs-and-widgets)
+- [Accessibility, visual and performance gates](#accessibility-visual-and-performance-gates)
+- [Failure diagnostics and private retention](#failure-diagnostics-and-private-retention)
+- [Apex/Jest/API/mobile results and release matrix](#apexjestapimobile-results-and-release-matrix)
+- [Additional web engines and native mobile](#additional-web-engines-and-native-mobile)
+- [Timing and failure classification](#timing-and-failure-classification)
 
 ## REST oracle and metadata regression
 

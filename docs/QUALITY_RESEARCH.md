@@ -1,6 +1,14 @@
 # Quality-focused automation design audit
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 Reviewed on October 6, 2026 against primary documentation. These decisions extend the existing Java/Salesforce framework. They do not introduce customer business cases, org assumptions or an AI dependency during regression execution.
+
+## Contents
+
+- [Sources and adopted practices](#sources-and-adopted-practices)
+- [Defect-detection requirements and proof](#defect-detection-requirements-and-proof)
+- [Boundaries and engineering decisions](#boundaries-and-engineering-decisions)
 
 ## Sources and adopted practices
 

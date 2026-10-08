@@ -1,5 +1,7 @@
 # Bundled quality assets
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 The web engine includes unmodified `axe.min.js` from **axe-core 4.14.0**, published by Deque Systems on the npm registry. Its [MPL license](../sf-e2e-engine-playwright/src/main/resources/hu/ak91/sf/e2e/engine/AXE-LICENSE.txt) accompanies the asset. Upstream project: [axe-core](https://github.com/dequelabs/axe-core).
 
 Pinned npm tarball: `https://registry.npmjs.org/axe-core/-/axe-core-4.14.0.tgz`.

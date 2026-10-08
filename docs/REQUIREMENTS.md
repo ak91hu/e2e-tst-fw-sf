@@ -1,6 +1,14 @@
 # Requirement and best-practice audit
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 The deliverable is a reusable Java Salesforce UI framework. Consumer business tests and deployment-specific maps remain outside the template. Internal verification harnesses validate framework behavior without shipping customer workflows.
+
+## Contents
+
+- [Requested capabilities](#requested-capabilities)
+- [Practices adapted from the supplied documentation](#practices-adapted-from-the-supplied-documentation)
+- [Safety of repairs](#safety-of-repairs)
 
 ## Requested capabilities
 

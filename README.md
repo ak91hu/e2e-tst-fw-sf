@@ -8,6 +8,8 @@
 
 Java, Maven, JUnit Jupiter and Playwright, with Allure 3 reporting. The user test workspace is empty. The framework has no customer org, business schema, profile name, Opportunity stages or predefined business scenarios.
 
+Framework-maintenance changes must keep the distribution free of org-specific business test cases. Internal checks belong to the implementation modules and use synthetic fixtures or local mock services. Target org URLs, credentials, business data and customer scenarios belong to the consuming project's private configuration and test suite.
+
 The lifecycle is **AI discovery/learning -> persistent locators and verified case recipes -> deterministic execution -> bounded retries -> confident repair and persistence**. Supply a test case as JSON or text, or discover visible navigation pages autonomously. Saved recipes rerun without AI, generated Java code or recompilation. Each installation supplies its own connection and inputs; ordinary execution and deterministic healing use no model.
 
 **Page Object Model is the default execution architecture.** Learning and replay use session-scoped page objects backed by the persistent locator repository; Java consumers use `sf.page(pageId)` or `sf.pages()`. Newly learned/discovered case IDs and CLI recipe filenames start with **`TST_`**. See [POM and naming](docs/PAGE_OBJECT_MODEL.md) for reuse, migration and typed business composition.
@@ -18,6 +20,7 @@ The [stable tooling snapshot](docs/DEPENDENCIES.md) lists the checked versions a
 
 ## Contents
 
+- [For AI agents and maintainers](#for-ai-agents-and-maintainers)
 - [Architecture](#architecture)
 - [Choose a workflow](#choose-a-workflow)
 - [Prerequisites and first run](#prerequisites-and-first-run)
@@ -44,6 +47,23 @@ The [stable tooling snapshot](docs/DEPENDENCIES.md) lists the checked versions a
 - [CI and troubleshooting](#ci-and-troubleshooting)
 - [Scope and verification](#scope-and-verification)
 - [Engineering documentation](#engineering-documentation)
+
+## For AI agents and maintainers
+
+Start with [AGENTS.md](AGENTS.md) for repository invariants and the maintenance workflow. Use the [documentation index](docs/README.md) to choose a task-specific reading path, then [DEVELOPMENT.md](docs/DEVELOPMENT.md) for the source/test map, focused commands, change recipes and handoff requirements. This README remains the user-facing setup and command guide.
+
+| Immediate need | Entry point |
+| --- | --- |
+| Locate the implementation and checks for a change | [Source and test map](docs/DEVELOPMENT.md#source-and-test-map) |
+| Run focused checks without an org/model | [Verification commands](docs/DEVELOPMENT.md#verification-commands) |
+| Extend recipe actions, healing, lifecycle, AI or reporting | [Change recipes](docs/DEVELOPMENT.md#change-recipes) |
+| Understand public contracts and side effects | [Implementation](docs/IMPLEMENTATION.md), then the owning feature guide from the [index](docs/README.md) |
+| Determine which version/receipt is authoritative | Current POM/source/CLI help, [dependency snapshot](docs/DEPENDENCIES.md) and dated [verification](docs/VERIFICATION.md) |
+| Update documentation and hand off work | [Documentation maintenance](docs/DEVELOPMENT.md#documentation-maintenance) and [completion and handoff](docs/DEVELOPMENT.md#completion-and-handoff) |
+
+Inspect the current worktree before editing and preserve existing changes. Framework regressions use synthetic fixtures in implementation modules; `sf-e2e-tests` remains empty. Target configuration, maps, recipes, values and business tests are supplied by consuming projects.
+
+Maven `test` runs unit/component checks; real-browser harnesses require `verify -Pchecks` and installed browsers. Maven `-Pchecks` selects build bindings, while runtime YAML/CLI `profile: checks` is a separate concept. A skipped-test package, missing selected suite or dated passing receipt does not establish the current change's correctness. Documentation-only maintenance normally needs the link/language check and `git diff --check`; changed executable examples also need semantic/API validation.
 
 ## Architecture
 
@@ -93,7 +113,7 @@ For a supplied case, learning is the first actual execution: it fills/clicks the
 
 ## Prerequisites and first run
 
-Use the latest stable JDK 27 with `JAVA_HOME` configured and Node.js 26.10.0 (npm 12.2.0) on `PATH`. The Java bytecode baseline remains 21 so existing consumers do not need a language-level migration. The included Maven Wrapper needs no global Maven installation. Initial dependency/Allure/browser installation needs network access. Live execution needs its selected browser; full framework checks exercise Chromium, Firefox and WebKit and need all three. Report rendering works offline after building.
+The checked build uses JDK 27 with `JAVA_HOME` configured and Node.js 26.10.0 (npm 12.2.0) on `PATH`; see the dated [dependency snapshot](docs/DEPENDENCIES.md). The Java bytecode/runtime baseline remains 21 so existing consumers do not need a language-level migration. The included Maven Wrapper needs no global Maven installation. Initial dependency/Allure/browser installation needs network access. Live execution needs its selected browser; full framework checks exercise Chromium, Firefox and WebKit and need all three. Report rendering works offline after building.
 
 For live Salesforce work, provide an authorized JWT configuration or external Playwright storage-state session, the application's exact HTTPS origins, and access to the UI you want to map. Configure a compatible model endpoint only for the initial learning/mapping phase. Node is required to build and render Allure 3 reports. It also runs the optional external-environment/subscription launcher, Git collector and LWC/Jest component runner. Replay uses no AI; its automatic Allure report uses the local Node runtime. Trend rendering itself remains Java-only.
 
@@ -152,7 +172,7 @@ java -jar sf-e2e-cli/target/sf-e2e.jar doctor
 java -jar sf-e2e-cli/target/sf-e2e.jar list --json
 ```
 
-Set `JAVA_HOME` to JDK 21. On Linux/macOS use `./mvnw`; Linux browser installation also needs `--with-deps`. `list --json` returns `[]`; `run` without user classes returns `NO_TESTS` before authentication.
+Set `JAVA_HOME` to the selected JDK: the checked CI build uses 27 and compilation targets Java 21. On Linux/macOS use `./mvnw`; Linux browser installation also needs `--with-deps`. `list --json` returns `[]`; `run` without user classes returns `NO_TESTS` before authentication. For module-focused development commands and their prerequisites, see [the development guide](docs/DEVELOPMENT.md#verification-commands).
 
 The packaged executable is `sf-e2e-cli/target/sf-e2e.jar`. Framework checks run in the implementation modules; they do not populate `sf-e2e-tests` with business scenarios. Use `java -jar sf-e2e-cli/target/sf-e2e.jar --help` or `<command> --help` for installed command options.
 
@@ -954,16 +974,21 @@ The framework is org-independent and configured per deployment. Browser automati
 
 No claim is made that every Salesforce edition, app, customization, authentication policy and UI combination has been tested. See [implementation](docs/IMPLEMENTATION.md) and [verification](docs/VERIFICATION.md) for the checks actually performed.
 
-The development implementation passed **278 internal checks in 47 suites**: 231 unit checks and 47 real-browser checks, with zero failures/errors/skips. The latest complete reactor verifies change-impact fallback/closure, parameter/context-separated trends, unknown AI cost, concrete component dispatch and mixed release-layer failures as well as the existing POM/naming and healing boundaries. The stable-stack migration additionally verifies legacy recipe bytes/checksums, JUnit 6 session cleanup, the bundled Allure 3 version and missing-Node evidence preservation. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** and the English/documentation validators pass. These are implementation receipts, not a hosted CI or universal private-org/device certification badge.
+The latest recorded full verification, on **October 8, 2026**, passed **293 internal checks in 49 suites**: 237 unit/component checks and 56 real-browser checks, with zero failures/errors/skips. It covers change-impact selection, trends, AI budgets, component/release verdicts, POM/healing, recipe compatibility, JUnit lifecycle and Allure integrity. The reliability regressions additionally check changing UI state, asynchronous selection, attempt deadlines and failed/repeated runtime cleanup. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** passed. This dated inventory is not a claim that checks were rerun for every later documentation edit; use [VERIFICATION.md](docs/VERIFICATION.md) and fresh command output for the actual scope. These are implementation receipts, not hosted CI or private-org/device certification.
 
 See the [requirement and best-practice audit](docs/REQUIREMENTS.md) for the implementation/evidence behind each requested capability.
 
 ## Engineering documentation
 
+Use the [documentation index](docs/README.md) for reading paths and the distinction between current contracts and dated review evidence.
+
 The [development implementation ledger](docs/ROADMAP_IMPLEMENTATION.md) maps all ten development tracks to shipped APIs, checks and explicit adoption boundaries. The [advanced guide](docs/ADVANCED_CAPABILITIES.md) documents configuration and usage; the [Salesforce capability review](docs/SALESFORCE_CAPABILITY_REVIEW.md) keeps org/device certification separate from implementation evidence.
 
 | Guide | What to use it for |
 | --- | --- |
+| [Agent instructions](AGENTS.md) | Repository invariants, efficient maintenance workflow and handoff requirements |
+| [Documentation index](docs/README.md) | Task-specific reading paths, document ownership and sources of truth |
+| [Development guide](docs/DEVELOPMENT.md) | Source/test map, focused verification, change recipes, compatibility and artifact ownership |
 | [Case workflows](docs/CASE_WORKFLOWS.md) | JSON/text authoring, runtime params, discovery, recipe persistence and provider-free replay |
 | [Page Object Model and naming](docs/PAGE_OBJECT_MODEL.md) | Default page APIs, typed composition, TST_ generation, historical compatibility and further efficiency priorities |
 | [Efficiency workflows](docs/EFFICIENCY_WORKFLOWS.md) | Reviewed change-impact selection, automatic metric trends, pinned LWC/Jest and native release integration |
@@ -978,5 +1003,6 @@ The [development implementation ledger](docs/ROADMAP_IMPLEMENTATION.md) maps all
 | [Requirements](docs/REQUIREMENTS.md) | Requested capabilities and their implementation/evidence |
 | [Verification](docs/VERIFICATION.md) | Exact framework check inventory, limits and live validation evidence |
 | [Test structure review](docs/TEST_STRUCTURE_REVIEW.md) | Coordinated JUnit execution and corrected selection/lifecycle behavior |
+| [Reliability review](docs/RELIABILITY_REVIEW.md) | Official best practices, readiness state, asynchronous multi-select, attempt budgets and failed/repeated runtime cleanup |
 
 The design incorporates the supplied [semantic locator](https://e2e.tester.army/docs/locators), [cache](https://e2e.tester.army/docs/cache), [exploration](https://e2e.tester.army/docs/explore), [security](https://e2e.tester.army/docs/security) and [CI](https://e2e.tester.army/docs/ci) practices. Cached actions and agent judgments remain separate from the model-free locator API.

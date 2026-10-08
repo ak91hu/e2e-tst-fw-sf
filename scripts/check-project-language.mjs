@@ -11,12 +11,14 @@ function walk(directory, extensions) {
     else if (extensions.includes(path.extname(item.name))) files.push(target);
   }
 }
-files.push(path.join(root, 'README.md'), path.join(root, 'sf-e2e.yaml'), path.join(root, 'ai-workflow.example.yaml'));
+files.push(path.join(root, 'README.md'), path.join(root, 'AGENTS.md'), path.join(root, 'sf-e2e.yaml'), path.join(root, 'ai-workflow.example.yaml'));
 walk(path.join(root, 'docs'), ['.md']);
 walk(path.join(root, '.github', 'workflows'), ['.yml']);
 walk(path.join(root, 'scripts'), ['.mjs', '.cjs', '.java']);
 for (const item of fs.readdirSync(root, { withFileTypes: true })) {
   if (item.isDirectory() && item.name.startsWith('sf-e2e-')) {
+    const moduleReadme = path.join(root, item.name, 'README.md');
+    if (fs.existsSync(moduleReadme)) files.push(moduleReadme);
     const main = path.join(root, item.name, 'src', 'main');
     if (fs.existsSync(main)) walk(main, ['.java', '.js']);
   }
@@ -52,5 +54,5 @@ for (const file of files) {
     }
   }
 }
-console.log(JSON.stringify({ status: failures.length ? 'FAILED' : 'PASSED', filesChecked: files.length, localLinksChecked: links, scope: 'Public docs, configuration, CI and production sources; human-reviewed English messages. Localized app/test data excluded.', failures }, null, 2));
+console.log(JSON.stringify({ status: failures.length ? 'FAILED' : 'PASSED', filesChecked: files.length, localLinksChecked: links, scope: 'Root agent guidance, public docs, module READMEs, configuration, CI and production sources; human-reviewed English messages. Localized app/test data excluded.', failures }, null, 2));
 if (failures.length) process.exitCode = 1;

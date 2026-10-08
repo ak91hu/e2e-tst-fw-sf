@@ -1,6 +1,17 @@
 # Framework efficiency assessment
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 Assessed on October 6, 2026 against repository source, repeated local measurements and retained verification evidence. The framework is effective at eliminating model usage from repeated recipe execution and at reducing duplicate discovery work. Short-case wall time is dominated by context startup and reporting; large locator repositories have a measurable read-path cost. The evidence supports those specific conclusions, not universal Salesforce compatibility, production throughput or paid-model quality claims.
+
+## Contents
+
+- [Method and reproducibility](#method-and-reproducibility)
+- [Measured components](#measured-components)
+- [AI cost effectiveness](#ai-cost-effectiveness)
+- [Quality retained during measurement](#quality-retained-during-measurement)
+- [Bottlenecks and remaining improvement priorities](#bottlenecks-and-remaining-improvement-priorities)
+- [Practical assessment](#practical-assessment)
 
 ## Method and reproducibility
 
@@ -116,7 +127,7 @@ The existing fault harnesses reject wrong counts/states, unprovable absence, dup
 | Medium for realistic confidence | Historical benchmark uses one input; the added cost comparison uses three fields and synthetic provider output | Neither can rank provider/model quality or predict a complex org's latency | Maintain a private fixed evaluation set, budgeted real-provider trials and defect rejection measurements |
 | Low for distribution | The earlier audit's shaded CLI was 253084453 bytes, approximately 241.4 MiB | Initial downloads/cache restoration are sizeable | Review packaging contents and artifact caching without removing required offline runtime/reporting capabilities |
 
-`UiReadiness.stable` requires four matching observations with three polling intervals. The Playwright polling interval is up to 100 ms. This contributes roughly 300 ms to a stable target-learning readiness phase before observation overhead. Avoiding a second such phase helps explain the local learning speedup even without provider latency.
+`UiReadiness.stable` requires four matching observations with three polling intervals. Stability includes route, text, value, checked/disabled state and semantic attributes; ephemeral node IDs and timestamps are excluded. The Playwright polling interval is up to 100 ms. This contributes roughly 300 ms to a stable target-learning readiness phase before observation overhead. Avoiding a second such phase helps explain the local learning speedup even without provider latency. The [October 8 reliability review](RELIABILITY_REVIEW.md) verifies changing-state rejection, asynchronous single-dispatch selection, attempt-budget enforcement and elimination of failed-lease context retention.
 
 Healing tries exact identity before promotion. Three default retry delays of 250 ms are implemented as three 100 ms polls per retry, approximately 900 ms total before additional observation/repair work if the deadline allows it. The first drift penalty near one second is therefore consistent with the code. Persisted repair brings the next strict run back close to ordinary replay. Reducing retries blindly could increase premature healing on a slowly loading app; choose policy from observed target behavior.
 

@@ -1,6 +1,17 @@
 # Salesforce automation capability and performance review
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 Reviewed on October 6, 2026 against repository code, local measurements and primary Salesforce/Playwright documentation. This is an engineering assessment and acceptance roadmap, not a claim that every Salesforce product or org has been tested. The consumer business-test workspace remains empty.
+
+## Contents
+
+- [Assessment](#assessment)
+- [Changes implemented in this review](#changes-implemented-in-this-review)
+- [Capability matrix](#capability-matrix)
+- [Implemented development tracks](#implemented-development-tracks)
+- [Recommended execution strategy](#recommended-execution-strategy)
+- [Adoption acceptance checklist](#adoption-acceptance-checklist)
 
 ## Assessment
 

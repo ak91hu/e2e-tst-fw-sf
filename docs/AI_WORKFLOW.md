@@ -1,8 +1,20 @@
 # Cost-conscious AI workflow with deterministic quality gates
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 All learned/discovered case IDs and CLI recipe filenames use `TST_`. Learning/replay execute through the default [Page Object Model](PAGE_OBJECT_MODEL.md), retaining fresh target resolution and independent case assertions. Saved page/control definitions require no generated Java compilation, and ordinary replay still constructs no model client.
 
 The workflow is executable repository code, not a prompt-only recommendation. `AiWorkflowClient` is the default provider path for `learn-case`, `discover-ui`, `map-ui`, JUnit AI agents and opt-in AI locator advice. Saved recipe replay and deterministic suites construct no model client. All code, policy examples and guidance are part of this repository; no customer cases or credentials are bundled.
+
+## Contents
+
+- [Execution flow](#execution-flow)
+- [Configure and run](#configure-and-run)
+- [Savings that preserve the oracle](#savings-that-preserve-the-oracle)
+- [Smaller requests, bounded batches and unchanged maps](#smaller-requests-bounded-batches-and-unchanged-maps)
+- [Accounting and failure behavior](#accounting-and-failure-behavior)
+- [Reports and engineer evaluation](#reports-and-engineer-evaluation)
+- [Primary design references](#primary-design-references)
 
 ## Execution flow
 

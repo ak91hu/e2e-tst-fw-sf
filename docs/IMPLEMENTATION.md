@@ -1,6 +1,16 @@
 # General framework implementation
 
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
 The framework contains no customer org, profile name, language/currency restriction, predefined stages, fixed business scenarios or built-in object page adapters. Former business adapters and the local pilot map are archived only under ignored `.reference`; they are excluded from source modules and packaged artifacts. The user test module remains empty.
+
+## Contents
+
+- [Default Page Object Model](#default-page-object-model)
+- [Connection and identity](#connection-and-identity)
+- [Mapping and storage](#mapping-and-storage)
+- [Deterministic execution and healing](#deterministic-execution-and-healing)
+- [Evidence and boundaries](#evidence-and-boundaries)
 
 ## Default Page Object Model
 
@@ -15,6 +25,8 @@ Identity aliases are dynamic `Persona` values rather than a Sales/Service enum. 
 JWT mode delegates to Salesforce OAuth/UI Bridge with validated destinations. Storage-state mode consumes an existing authorized cookie/localStorage/IndexedDB session, validates origin boundaries, registers stored credentials and leaves the external file untouched. It requires session renewal through the installation's authentication process when expired. No credentials or session files are shipped.
 
 ## Mapping and storage
+
+Discovery readiness compares route, semantic targets/attributes, text, values and checked/disabled states across four matching observations. Ephemeral node IDs and capture timestamps are excluded. This gate does not establish a business outcome; continuously changing content may require a narrower named scope. See [the readiness and runtime review](RELIABILITY_REVIEW.md) for the regression evidence.
 
 `UiMapper` observes explicit routes/scopes and uses provider-neutral `ModelClient` only to name observed reusable controls. Model output cannot execute actions. Schema validation, coverage, uniqueness, node references, scope collisions, model/time budgets and fresh post-model observations precede a write. Invalid JSON/protocol gets at most one repair call; transport failures propagate.
 
@@ -47,6 +59,8 @@ An exact semantic match must also retain the saved frame and have no conflicting
 Only a pre-dispatch `NODE_STALE` rejection can trigger action-resolution retry. Dispatched interactions are not blindly repeated after uncertain failures. A healed locator never substitutes for a business assertion or changes the expected result. Future consumer tests provide values, outcomes and business workflows. Optional agent record scopes accept an explicit app-relative record route and container; localized choice controls are governed by semantic role rather than English field names.
 
 ## Evidence and boundaries
+
+Browser workers reuse owner-thread processes with fresh contexts. Failed engine initialization releases its partially created context; repeated runtime closure is idempotent and cannot remove a replacement runtime. Explicit operation timeouts use the minimum of caller/attempt budgets and the action cap. Custom multi-select validates the complete visible option set before selection mutation and waits for asynchronous selection state after a single click. These behaviors are maintained by `ReliabilityHarnessIT`.
 
 `FrameworkConfig.Quality` supplies enabled browser-defect gates, bounded issue storage, optional drift/retry limits and exact scoped expiring waivers. `PlaywrightEngine` observes pages/popups, console errors, 5xx responses and failed approved-origin requests after authentication. No response bodies, headers/cookies or URL queries are exported. CLI and JUnit finalization run `BrowserQuality`; business and quality failures retain their evidence and produce failure verdicts rather than silent success. Overflow is always fatal.
 
