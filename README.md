@@ -103,6 +103,7 @@ Choose the entry point from the information you already have. The saved artifact
 | --- | --- | --- | --- |
 | Known route and reusable controls | `map-ui` with an explicit page/route or plan | Versioned semantic locator map | `verify-ui` or project-owned deterministic Java cases |
 | Written business case | `learn-case --spec` | Verified recipe and state-specific locator keys | `replay-case` or dataset `run-suite` |
+| Text case to review before target execution | `plan-case`, review, then `validate-case` | Editable specification and private parameters; no browser or target login | `learn-case --spec` to verify and create a recipe |
 | Human-readable case | `learn-case --instructions --id --route` | Planned/verified recipe; private extracted parameters when necessary | The same provider-free recipe execution |
 | Visible app navigation to inventory | `discover-ui --max-pages` | Bounded locator inventory and verified presence recipe | Replay the visited surface's presence checks |
 | Existing verified recipe | `replay-case --file` | Current execution evidence and automatic Allure | Repeat with appropriate current parameters |
@@ -258,7 +259,11 @@ java -jar sf-e2e-cli/target/sf-e2e.jar replay-case --config project.local.yaml -
 
 `learn-case` accepts structured steps, or `--instructions <UTF-8 file> --id <id> --route <start route>` for a text case. Text can contain parameter references or literal inputs/expectations; extracted literals must match the supplied text verbatim and are saved in a separate private parameter file. AI identifies targets from the actual UI; deterministic code executes the specified actions and verifies caller-supplied expectations. A case must end in an assertion. Successful learning saves a checksummed JSON recipe and state-specific locators; inputs/expected values stay outside the recipe. Existing recipes are preserved by requiring a new output path for re-learning.
 
+For an editable preview, use `plan-case --instructions <file> --id <id> --route <route> --output <new spec> --config <project YAML>`. Planning uses only the configured model, with no target login, browser or locator writes. Review the saved specification/expected values, then use `validate-case --spec <spec> --params <private values>` for credential-free offline validation and `learn-case --spec` for actual UI verification. A plan is not a replayable recipe. See [the review workflow](docs/CASE_WORKFLOWS.md#review-a-plan-before-executing).
+
 For autonomous read-only discovery, use `discover-ui --id <id> --route <route> --max-pages 5 --output <new recipe>`. It maps reachable visible navigation pages and saves verified presence checks. A supplied workflow covers forms/dialogs/business actions that link discovery cannot reach. `replay-case` constructs no model client, supports the same deterministic self-healing and produces permanent attempt journals, automatic Allure HTML reports and masked screenshots.
+
+Discovery prints and persists visited checkpoints, known remaining routes and its stop reason (`PAGE_LIMIT`, `MODEL_SELECTION_STOPPED` or `NO_MORE_ELIGIBLE_ROUTES`). A passing presence recipe never claims complete application coverage. Use [the scope summary](docs/CASE_WORKFLOWS.md#interpret-discovery-scope-and-continue) to choose a new start route, page budget or explicit business workflow.
 
 See [case workflows](docs/CASE_WORKFLOWS.md) for input formats, supported steps, text examples, discovery boundaries, record parameters and the external-environment launcher. The repository still ships no consumer cases.
 
@@ -730,6 +735,8 @@ Framework checks do not certify target-app business coverage. Maintain a project
 | `doctor` | Validate runtime/configuration; explicit live profiles also check credential references without login | Only checks model configuration when the selected profile needs it |
 | `list --json` | Inspect explicitly supplied Java cases/dependencies; empty template returns `[]` | No |
 | `learn-case` | Learn a JSON/text case and save a verified recipe | Yes |
+| `plan-case` | Translate text into an editable specification; no target login/browser | Model only |
+| `validate-case` | Validate specification, references and runtime values offline; no YAML needed | No |
 | `discover-ui` | Map bounded visible navigation and save presence checks | Yes |
 | `replay-case` | Execute a saved recipe with current values, assertions and deterministic healing | No |
 | `validate-suite` | Preflight selected dataset recipes/maps/parameters before login | No |
@@ -878,7 +885,7 @@ The external-env launcher is optional and accepts any environment path:
 node scripts/run-with-env.mjs --env-file <external-env-file> -- verify-ui --config project.local.yaml --plan mapping.local.json --persona reviewer
 ```
 
-For an existing authorized ChatGPT subscription adapter, pass `--chatgpt-project <external-project-directory>` with `map-ui`, `learn-case` or `discover-ui`. The temporary private loopback bridge reuses its installed provider and shuts down/aborts pending calls with Java. `replay-case` starts no bridge. Normal Java execution needs no external subscription project; its automatic Allure 3 reports use the local Node runtime. Credentials are never copied into the framework.
+For an existing authorized ChatGPT subscription adapter, pass `--chatgpt-project <external-project-directory>` with `map-ui`, `plan-case`, `learn-case` or `discover-ui`. The temporary private loopback bridge reuses its installed provider and shuts down/aborts pending calls with Java. `replay-case` and `validate-case` start no bridge. Normal Java execution needs no external subscription project; its automatic Allure 3 reports use the local Node runtime. Credentials are never copied into the framework.
 
 ## Automatic Allure reports and screenshots
 
@@ -974,7 +981,7 @@ The framework is org-independent and configured per deployment. Browser automati
 
 No claim is made that every Salesforce edition, app, customization, authentication policy and UI combination has been tested. See [implementation](docs/IMPLEMENTATION.md) and [verification](docs/VERIFICATION.md) for the checks actually performed.
 
-The latest recorded full verification, on **October 8, 2026**, passed **293 internal checks in 49 suites**: 237 unit/component checks and 56 real-browser checks, with zero failures/errors/skips. It covers change-impact selection, trends, AI budgets, component/release verdicts, POM/healing, recipe compatibility, JUnit lifecycle and Allure integrity. The reliability regressions additionally check changing UI state, asynchronous selection, attempt deadlines and failed/repeated runtime cleanup. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** passed. This dated inventory is not a claim that checks were rerun for every later documentation edit; use [VERIFICATION.md](docs/VERIFICATION.md) and fresh command output for the actual scope. These are implementation receipts, not hosted CI or private-org/device certification.
+The latest recorded full verification, on **October 8, 2026**, passed **302 internal checks in 50 suites**: 244 unit/component checks and 58 real-browser checks, with zero failures/errors/skips. It covers change-impact selection, trends, AI budgets, component/release verdicts, POM/healing, recipe compatibility, JUnit lifecycle and Allure integrity. The usability regressions additionally check browser-free planning, offline case/value validation, protected artifacts and discovery frontier/stop reasons; reliability checks cover changing UI state, asynchronous selection, attempt deadlines and failed/repeated runtime cleanup. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** passed. This dated inventory is not a claim that checks were rerun for every later documentation edit; use [VERIFICATION.md](docs/VERIFICATION.md) and fresh command output for the actual scope. These are implementation receipts, not hosted CI or private-org/device certification.
 
 See the [requirement and best-practice audit](docs/REQUIREMENTS.md) for the implementation/evidence behind each requested capability.
 

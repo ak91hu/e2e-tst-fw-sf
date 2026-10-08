@@ -4,12 +4,23 @@
 
 ## Contents
 
+- [October 8 case usability review](#october-8-case-usability-review)
 - [October 8 agent documentation review](#october-8-agent-documentation-review)
 - [October 8 reliability review](#october-8-reliability-review)
 - [October 6 stable-stack audit](#october-6-stable-stack-audit)
 - [Completion audit](#completion-audit)
 - [What the evidence does and does not establish](#what-the-evidence-does-and-does-not-establish)
 - [Live org validation](#live-org-validation)
+
+## October 8 case usability review
+
+The case workflow now separates editable AI planning (`plan-case`), configuration-free offline specification/value preflight (`validate-case`) and verified UI learning. The planner retains the existing public learning APIs and shares their budget when used inside direct text learning. Missing runtime parameters are named without echoing values. Discovery deduplicates navigation candidates, probes the last capped page and reports visited checkpoints, known remaining routes, stop reason and explicit business/role coverage limits. The summary is retained in the redacted permanent journal and workflow report; recipe schema/checksums are unchanged.
+
+Focused Maven verification passed `CaseRecipeTest`, `CasePlannerTest`, `CaseLearnerTest`, `CaseCommandsTest` and the six real-Chromium `CaseWorkflowHarnessIT` checks, including page-limit and model-stop frontier faults. Command: `mvnw.cmd -B -ntp verify -Pchecks "-Dtest=CaseRecipeTest,CasePlannerTest,CaseLearnerTest,CaseCommandsTest" "-Dsurefire.failIfNoSpecifiedTests=false" "-Dit.test=CaseWorkflowHarnessIT" "-Dfailsafe.failIfNoSpecifiedTests=false"`. Optional local receipt: `.tools/usability-focused.log`.
+
+The newly packaged Java 21 CLI passed an isolated local-HTTP planning smoke check with no target credentials: it created an editable specification and separate literal values with one synthetic model call, validated them without a YAML file, named a missing parameter and preserved existing artifacts before making another provider request. No browser, locator, journal or report artifacts were created by planning/validation. All ten Node checks pass and the modified subscription launcher passes `node --check`. These are synthetic framework checks, not live-org workflow coverage or paid-provider quality measurements. Optional local receipts: `.tools/usability-smoke.json` and `.tools/UsabilitySmoke.py`.
+
+The subsequent full Windows reactor passed `mvnw.cmd -B -ntp verify -Pchecks` on Temurin 27+35 in 5 minutes 28 seconds: **302 checks in 50 suites, comprising 244 unit/component and 58 real-browser checks**, with zero failures/errors/skips. The empty consumer Java workspace remains unchanged. This adds nine regression executions to the earlier reliability inventory. Optional local receipts: `.tools/usability-full.log` and `.tools/usability-inventory.json`; these ignored receipts are not prerequisites for another checkout.
 
 ## October 8 agent documentation review
 

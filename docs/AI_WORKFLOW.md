@@ -4,7 +4,7 @@
 
 All learned/discovered case IDs and CLI recipe filenames use `TST_`. Learning/replay execute through the default [Page Object Model](PAGE_OBJECT_MODEL.md), retaining fresh target resolution and independent case assertions. Saved page/control definitions require no generated Java compilation, and ordinary replay still constructs no model client.
 
-The workflow is executable repository code, not a prompt-only recommendation. `AiWorkflowClient` is the default provider path for `learn-case`, `discover-ui`, `map-ui`, JUnit AI agents and opt-in AI locator advice. Saved recipe replay and deterministic suites construct no model client. All code, policy examples and guidance are part of this repository; no customer cases or credentials are bundled.
+The workflow is executable repository code, not a prompt-only recommendation. `AiWorkflowClient` is the default provider path for `plan-case`, `learn-case`, `discover-ui`, `map-ui`, JUnit AI agents and opt-in AI locator advice. Saved recipe replay, offline `validate-case` and deterministic suites construct no model client. All code, policy examples and guidance are part of this repository; no customer cases or credentials are bundled.
 
 ## Contents
 
@@ -50,6 +50,8 @@ java -jar sf-e2e-cli/target/sf-e2e.jar replay-case --config project.local.yaml -
 ```
 
 Use supplied JSON steps when intent is already structured: this avoids a text-planning model call. Text instructions remain supported and share the same budget with subsequent target learning. Mapping and autonomous route selection also share one workflow instance throughout the command, so moving to another scope/page does not reset its allowance.
+
+For review before execution, `plan-case` translates text into an editable specification without a target session or UI engine. `CasePlanner` validates the same literal/reference/schema contract used by direct text learning. The separate plan command has its own bounded model workflow; a later `learn-case --spec` has a new learning budget and avoids repeating text translation. `validate-case` preflights the edited specification and runtime values offline, without a provider. Plans and offline validation establish intent/input validity, while learning establishes observed UI execution and caller assertions. See [the review sequence](CASE_WORKFLOWS.md#review-a-plan-before-executing).
 
 Learning executes user-supplied actions. Plan appropriate unique/runtime data before replaying a mutating recipe. There is no automatic second execution of a completed business action merely to evaluate the model or retry a failure. The caller explicitly starts a later replay.
 

@@ -50,14 +50,45 @@ class CaseWorkflowHarnessIT {
     @Test void autonomousDiscoveryNeverDispatchesButtonsAndGeneratedChecksReplayWithoutAi() throws Exception {
         try(var fixture=new Fixture()) {
             var config=fixture.config();var secrets=new SecretRegistry();var deadline=Deadline.after(Duration.ofSeconds(60));
-            var disk=new LocatorStore(root,"isolated","read-write");CaseRecipe recipe;
+            var disk=new LocatorStore(root,"isolated","read-write");CaseRecipe recipe;var events=new ArrayList<Map<String,Object>>();
             try(var engine=new PlaywrightEngine(config,secrets,deadline)) {
-                recipe=new UiExplorer(engine,disk,fixture.model(secrets),config,secrets,e -> {}).discover("auto-map","/start","isolated",2,deadline);
+                recipe=new UiExplorer(engine,disk,fixture.model(secrets),config,secrets,events::add).discover("auto-map","/start","isolated",2,deadline);
             }
             assertEquals(4,recipe.steps().size());assertEquals(3,fixture.calls.get());assertEquals(0,fixture.submitted.get());
+            var summary=events.stream().filter(e -> "discovery-completed".equals(e.get("kind"))).findFirst().orElseThrow();
+            assertEquals("NO_MORE_ELIGIBLE_ROUTES",summary.get("stopReason"));assertEquals(0,summary.get("remainingRouteCount"));
+            assertEquals(List.of("/start","/editor"),summary.get("visitedRoutes"));assertEquals(false,summary.get("applicationCoverageComplete"));
             fixture.provider.stop(0);
             try(var engine=new PlaywrightEngine(config,secrets,deadline)) { new CaseRunner(engine,disk,config,deadline,e -> {}).run(recipe,"isolated",disk,Map.of()); }
             assertEquals(0,fixture.submitted.get());assertEquals(3,fixture.calls.get());
+        }
+    }
+    @Test void discoveryReportsLastPageFrontierEvenWhenNoNavigationDecisionWasAllowed() throws Exception {
+        try(var fixture=new Fixture()) {
+            var config=fixture.config();var secrets=new SecretRegistry();var deadline=Deadline.after(Duration.ofSeconds(60));
+            var events=new ArrayList<Map<String,Object>>();var disk=new LocatorStore(root,"isolated","read-write");
+            try(var engine=new PlaywrightEngine(config,secrets,deadline)) {
+                new UiExplorer(engine,disk,fixture.model(secrets),config,secrets,events::add).discover("bounded","/start","isolated",1,deadline);
+            }
+            var summary=events.stream().filter(e -> "discovery-completed".equals(e.get("kind"))).findFirst().orElseThrow();
+            assertEquals("PAGE_LIMIT",summary.get("stopReason"));assertEquals(List.of("/editor"),summary.get("remainingRoutes"));
+            assertEquals(1,summary.get("remainingRouteCount"));assertEquals(0,summary.get("pendingPages"));
+            assertEquals(1,fixture.calls.get());assertEquals(0,fixture.submitted.get());
+            assertFalse(Json.string(summary).contains("sid="));assertFalse(Json.string(summary).contains("foreign.example"));
+        }
+    }
+    @Test void modelStoppingNavigationDoesNotClaimTheKnownFrontierWasCovered() throws Exception {
+        try(var fixture=new Fixture()) {
+            fixture.selectRoutes.set(false);
+            var config=fixture.config();var secrets=new SecretRegistry();var deadline=Deadline.after(Duration.ofSeconds(60));
+            var events=new ArrayList<Map<String,Object>>();var disk=new LocatorStore(root,"isolated","read-write");
+            try(var engine=new PlaywrightEngine(config,secrets,deadline)) {
+                new UiExplorer(engine,disk,fixture.model(secrets),config,secrets,events::add).discover("stopped","/start","isolated",5,deadline);
+            }
+            var summary=events.stream().filter(e -> "discovery-completed".equals(e.get("kind"))).findFirst().orElseThrow();
+            assertEquals("MODEL_SELECTION_STOPPED",summary.get("stopReason"));assertEquals(List.of("/editor"),summary.get("remainingRoutes"));
+            assertEquals(List.of("/start"),summary.get("visitedRoutes"));assertEquals(false,summary.get("applicationCoverageComplete"));
+            assertEquals(0,fixture.submitted.get());
         }
     }
     @Test void incorrectExpectedResultDoesNotProduceAPassingRecipeOrRetrySubmit() throws Exception {
@@ -83,6 +114,7 @@ class CaseWorkflowHarnessIT {
     private static final class Fixture implements AutoCloseable {
         final HttpServer app,provider;final AtomicInteger calls=new AtomicInteger(),submitted=new AtomicInteger();
         final AtomicReference<String> label=new AtomicReference<>("Original field");final List<String> requests=new ArrayList<>();
+        final AtomicBoolean selectRoutes=new AtomicBoolean(true);
         Fixture() throws Exception {
             app=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);provider=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
             app.createContext("/start",e -> html(e,"<h1>Start</h1><a href='/editor'>Continue</a><button onclick='fetch(\"/submit\")'>Do work</button>"+
@@ -110,7 +142,7 @@ class CaseWorkflowHarnessIT {
                             for(var n:request.path("observation").path("nodes")) targets.add(Map.of("key","control."+(++index),"nodeId",n.path("id").asString()));
                             data=Map.of("targets",targets);
                         }
-                        case "discover-routes" -> data=Map.of("routes",List.of("/editor"));
+                        case "discover-routes" -> data=Map.of("routes",selectRoutes.get()?List.of("/editor"):List.of());
                         default -> throw new IllegalStateException("Unexpected model kind");
                     }
                     var completion=Map.of("tool","finish","verdict","PASSED","reason","Current targets","evidenceRefs",List.of(),"data",data);

@@ -10,6 +10,7 @@ Use this index to read the smallest set of documents needed for a task. The proj
 | --- | --- | --- |
 | First maintenance task | [Agent instructions](../AGENTS.md), [Development guide](DEVELOPMENT.md), [Implementation](IMPLEMENTATION.md) | Scope, invariants, source ownership and checks |
 | Find a CLI workflow | [README workflow selector](../README.md#choose-a-workflow), [Case workflows](CASE_WORKFLOWS.md) | Correct command and expected artifacts |
+| Review generated intent or discovery gaps | [Plan review](CASE_WORKFLOWS.md#review-a-plan-before-executing), [Discovery scope](CASE_WORKFLOWS.md#interpret-discovery-scope-and-continue) | Editable intent before actions, offline preflight and honest remaining-work summary |
 | Change controls, healing or page APIs | [Page Object Model](PAGE_OBJECT_MODEL.md), [Implementation](IMPLEMENTATION.md), [Reliability review](RELIABILITY_REVIEW.md) | Fresh-state, identity, retry and cleanup contracts |
 | Change AI learning or transport | [AI workflow](AI_WORKFLOW.md), [Case workflows](CASE_WORKFLOWS.md), [Development guide](DEVELOPMENT.md#change-recipes) | Request/budget boundaries and provider-free replay checks |
 | Change JUnit lifecycle or scheduling | [Test structure review](TEST_STRUCTURE_REVIEW.md), [Advanced capabilities](ADVANCED_CAPABILITIES.md), [Development guide](DEVELOPMENT.md#change-recipes) | Teardown, dependencies, owner threads and resource locks |

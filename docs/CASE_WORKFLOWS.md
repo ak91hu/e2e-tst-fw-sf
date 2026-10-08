@@ -6,19 +6,24 @@ The consumer workspace stays empty. Supply your own case as JSON or UTF-8 text, 
 
 ## Contents
 
-- [Three commands](#three-commands)
+- [Five commands](#five-commands)
+- [Review a plan before executing](#review-a-plan-before-executing)
 - [A supplied structured case](#a-supplied-structured-case)
 - [A supplied text case](#a-supplied-text-case)
 - [Autonomous UI discovery](#autonomous-ui-discovery)
+- [Interpret discovery scope and continue](#interpret-discovery-scope-and-continue)
+- [Resolve incomplete case input](#resolve-incomplete-case-input)
 - [Supported steps](#supported-steps)
 - [Persistence, healing and evidence](#persistence-healing-and-evidence)
 - [Dataset suites and quality gates](#dataset-suites-and-quality-gates)
 - [Existing external environment / subscription](#existing-external-environment-subscription)
 
-## Three commands
+## Five commands
 
 | Command | Input | Result | Model on later runs |
 | --- | --- | --- | --- |
+| `plan-case` | Text instructions, explicit start route and optional runtime parameters | An editable specification and separate private parameters; no target session or UI execution | Planning uses AI; review the specification before learning |
+| `validate-case` | A structured specification and its runtime parameters | Offline schema, assertion and parameter/value validation; no configuration or model | None; this does not verify target UI or business correctness |
 | `learn-case` | Your structured case or text instructions and runtime parameters | A recipe after every action/assertion succeeds; persistent locators for its visited states | None with `replay-case` |
 | `discover-ui` | Start route, case ID, hard page budget | AI mapping of visible navigation pages and a recipe of verified presence checks | None with `replay-case` |
 | `replay-case` | A saved recipe, matching configuration/persona, runtime parameters | Deterministic actions/assertions, locator retry/healing, evidence and attempt journal | No model client is constructed |
@@ -26,6 +31,22 @@ The consumer workspace stays empty. Supply your own case as JSON or UTF-8 text, 
 Learning performs the supplied actions. For a write workflow, provide its complete steps, runtime data and expected outcome. Discovery follows eligible navigation hrefs without submitting forms or clicking action buttons. Its smoke checks establish UI presence, not business-process correctness.
 
 Page Object Model is the default for learning and replay. Controls are grouped by route context into revision-isolated page models; persistent `page`/`key` references remain the recipe contract. New IDs and CLI output filenames automatically receive `TST_` if absent; existing historical recipes keep their original IDs/checksums. The prefix counts toward the 70-character ID limit. Use the actual printed output path for replay/suite entries. See [POM and naming](PAGE_OBJECT_MODEL.md).
+
+## Review a plan before executing
+
+Use this route when a written case needs AI translation and you want to inspect the actions, scopes and expected results before the target is opened. `plan-case` uses the configured mapping model and bounded call/token/time policy, but constructs no browser, authenticates no target and writes no locators. It needs the project YAML and model credential; it does not require `--locator-mode read-write`. Target configuration fields must still satisfy the YAML schema.
+
+```powershell
+java -jar sf-e2e-cli/target/sf-e2e.jar plan-case --config project.local.yaml --instructions flow.local.txt --id TST_my-flow --route /your/application/route --params values.local.json --output .sf-e2e/plans/TST_my-flow-v1.local.json
+java -jar sf-e2e-cli/target/sf-e2e.jar validate-case --spec .sf-e2e/plans/TST_my-flow-v1.local.json --params .sf-e2e/plans/TST_my-flow-v1.local.json.params.local.json
+java -jar sf-e2e-cli/target/sf-e2e.jar learn-case --config project.local.yaml --spec .sf-e2e/plans/TST_my-flow-v1.local.json --params .sf-e2e/plans/TST_my-flow-v1.local.json.params.local.json --output .sf-e2e/cases/TST_my-flow-v1.local.json --locator-mode read-write
+```
+
+After the first command, review/edit the specification before continuing. It contains `{id,startRoute,steps}` with target instructions and parameter references. Every supplied parameter plus any validated verbatim literal goes into `<spec filename>.params.local.json`; if there are no parameters, no sidecar is written and omit `--params` in subsequent commands. The output filename receives `TST_` when absent. Existing output/sidecar files are preserved. Use the printed path and a new versioned path for replanning.
+
+A plan is **unverified intent**, not a checksummed runnable recipe. Do not feed it to `replay-case` or `run-suite`. `validate-case` needs only the specification and optional parameters, so it works without a YAML file, model endpoint, target session or browser installation. Its JSON response includes step/assertion counts, required parameter names and `uiVerified:false`, without echoing values. It validates supported kinds/routes, a final assertion, required references and operation values, including booleans, keys, counts and structured widget inputs. It cannot establish that a label is unique, the target exists, the application behaves correctly or an absence assertion is observable.
+
+Only successful `learn-case` execution creates a verified recipe bound to the target/persona. After reviewing a plan, structured learning avoids another text-planning call; target resolution still needs AI. Both direct text learning and separate planning use the same protocol, literal checks and bounded format repair. Neither invents missing expected results or runtime data.
 
 ## A supplied structured case
 
@@ -94,6 +115,34 @@ java -jar sf-e2e-cli/target/sf-e2e.jar replay-case --config project.local.yaml -
 AI maps each visited page, then prioritizes destinations from currently visible links. Every visited page gets a deterministic visible-control checkpoint, preferring a heading. The recipe saves `open`/`expectVisible` steps. A one-page discovery requires no navigation decision. If no eligible destinations exist, discovery completes with the pages actually visited; it does not claim complete app coverage.
 
 Navigation is bounded to 1..50 pages, at most 200 probed links/100 decision candidates per page, the configured base origin (plus its conventional Lightning counterpart), and explicit href routes. Record links/IDs, authentication/logout/destructive paths, scripts, downloads, inline onclick links, fragments and non-view query parameters are excluded. Permitted query keys are `filterName`, `view`, `tab`, `sort`, `order`, `page`, `pageSize`, `lang`, `language`, and `locale`. For other domains/routes, choose the actual app base origin/start route or supply an explicit case/mapping plan. Buttons, custom JavaScript navigation and hidden menus/dialogs require a supplied workflow. Action/model-call/token/overall time budgets remain hard limits.
+
+## Interpret discovery scope and continue
+
+A successful discovery saves its structured `discovery` summary in both `case-report.json` and the permanent attempt journal, attaches the completion event to Allure's redacted event log and prints the summary. The summary is evidence of navigation presence; `applicationCoverageComplete` is always `false`. It contains visited routes, each verified checkpoint's page/key, model-call count, page budget, known remaining-route count/list and excluded business scope. It is not an org-wide percentage or a complete inventory.
+
+| `stopReason` | Meaning | Next action |
+| --- | --- | --- |
+| `PAGE_LIMIT` | The hard page cap was reached with known unvisited eligible routes | Increase `--max-pages` within 1..50, or start a new discovery at a listed remaining route with a new ID/output |
+| `MODEL_SELECTION_STOPPED` | The model selected no further queued destinations, although known eligible routes remain | Review the remaining list and explicitly start from a relevant route; use a supplied case for hidden/action-driven navigation |
+| `NO_MORE_ELIGIBLE_ROUTES` | No known eligible destination remains unvisited in the observed surface | Review other personas, forms, dialogs and business outcomes as separate supplied workflows |
+
+Even the last visited page is probed for eligible hrefs before reporting the frontier. `pendingPages` counts only queued model-selected destinations; `remainingRouteCount` includes known destinations the model did not select. Thus a one-page limit can have zero queued pages and still list remaining work. Remaining routes are sorted, capped at 200 displayed entries and marked with `remainingRoutesTruncated`; `candidateLimitReached` identifies a navigation decision with more than 100 unique candidates. The engine's own bounded probes still apply. Routes excluded by the engine are not added to the remaining list. Duplicate hrefs consume one decision candidate.
+
+The presence recipe can pass even when the traversal stops early; this means its saved checkpoints passed, not that the application was fully explored. Model/action/token/time exhaustion or incomplete observations remain failures and do not publish a passing recipe. To continue discovery, use a new output path and inspect the new summary; there is no hidden resume state or automatic merging of recipes.
+
+## Resolve incomplete case input
+
+| Symptom | Correction |
+| --- | --- |
+| `CASE_PARAMETER_REQUIRED` names missing references | Supply those keys in a private string-valued JSON parameter file; include explicit expected values |
+| A final click/save is rejected | Add the caller's observable expected result as a supported assertion |
+| `CASE_LEARNING_BLOCKED` during planning | Specify actions, target labels/scopes, inputs and expected results explicitly; use `--spec` for exact intent |
+| Offline validation passes but learning reports an ambiguous target | Use a named dialog/form/region scope and a precise instruction; offline validation cannot inspect the UI |
+| `NEGATIVE_ASSERTION_UNPROVABLE` | First identify the same visible target with stable `testId`/`apiName`; an invented absent control cannot establish success |
+| `CASE_RECIPE_EXISTS` | Preserve the previous artifact and choose a new versioned specification/recipe output, accounting for the automatic `TST_` prefix and parameter sidecar |
+| Replay rejects a plan or a different persona's recipe | Learn the reviewed specification for that target/persona, then replay the printed verified recipe path |
+
+Keep setup, uniqueness and cleanup requirements explicit in the consuming project. Discovery does not infer business expectations, create records or establish role coverage. No target org workflow or generated business case belongs in the framework distribution.
 
 ## Supported steps
 

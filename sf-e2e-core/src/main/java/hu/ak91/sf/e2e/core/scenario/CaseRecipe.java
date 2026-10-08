@@ -58,6 +58,10 @@ public record CaseRecipe(int schemaVersion,String id,String namespaceHash,String
         }
     }
     public static void validateParams(Set<String> required,Map<String,String> params,List<Step> steps) {
+        if(params!=null) {
+            var missing=new TreeSet<>(required);missing.removeAll(params.keySet());
+            Failure.require(missing.isEmpty(),"CASE_PARAMETER_REQUIRED","Missing case parameters: "+String.join(", ",missing)+". Supply --params with explicit inputs and expected values; values are never inferred.");
+        }
         Failure.require(params!=null && params.keySet().containsAll(required) && params.size()<=200 && params.values().stream().allMatch(v -> v!=null && v.length()<=10000),
             "CASE_PARAMETER_REQUIRED","Supply all required case parameters (values are never stored in recipes)");
         for(var step:steps) if(Set.of("setChecked","expectChecked","press").contains(step.kind())) {

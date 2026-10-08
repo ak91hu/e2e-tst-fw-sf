@@ -31,7 +31,7 @@ let bridge;let modelCalls=0;let child;const activeCalls=new Set();
 const secrets=Object.entries(env).filter(([key,value])=>value && /KEY|TOKEN|PASSWORD|CLIENT_ID|USERNAME|OAUTH/.test(key)).map(([,value])=>value);
 const redact=text=>secrets.reduce((value,secret)=>value.split(secret).join('[REDACTED]'),text);
 try {
-    if(['map-ui','learn-case','discover-ui'].includes(cli[0]) && flags['--chatgpt-project'] && !env.E2E_MODEL_API_KEY) {
+    if(['map-ui','plan-case','learn-case','discover-ui'].includes(cli[0]) && flags['--chatgpt-project'] && !env.E2E_MODEL_API_KEY) {
         if(env.E2E_MODEL_PROVIDER && env.E2E_MODEL_PROVIDER!=='chatgpt') throw new Error('The subscription adapter requires E2E_MODEL_PROVIDER=chatgpt');
         const require=createRequire(join(resolve(flags['--chatgpt-project']),'package.json'));
         const {chatgpt}=await import(pathToFileURL(require.resolve('e2e/oauth/chatgpt')).href);

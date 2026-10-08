@@ -36,7 +36,8 @@ public final class UiExplorer {
         FrameworkConfig.validateRoute(startRoute);
         Failure.require(store.writable(),"LOCATOR_READ_ONLY","Discovery requires a writable locator map");
         events.accept(Map.of("kind","discovery-plan-ready","route",startRoute,"maxPages",maxPages));
-        var queue=new ArrayDeque<String>();queue.add(startRoute);Set<String> queued=new HashSet<>(queue),visited=new HashSet<>();
+        var queue=new ArrayDeque<String>();queue.add(startRoute);Set<String> queued=new HashSet<>(queue),visited=new LinkedHashSet<>(),eligible=new TreeSet<>();
+        List<Map<String,Object>> checkpoints=new ArrayList<>();boolean candidateLimitReached=false;
         List<CaseRecipe.Step> steps=new ArrayList<>();String modelRevision=UUID.randomUUID().toString();
         var mapper=new UiMapper(engine,store,model,config.agent(),secrets,events);
         var runner=new CaseRunner(engine,store,config,deadline,events);
@@ -54,11 +55,18 @@ public final class UiExplorer {
             steps.add(new CaseRecipe.Step("open",null,null,route,null,null));
             var assertion=new CaseRecipe.Step("expectVisible",page,check.key(),null,null,null);
             runner.execute(assertion,Map.of());steps.add(assertion);
+            checkpoints.add(Map.of("route",route,"page",page,"key",check.key(),"assertion","expectVisible"));
             events.accept(Map.of("kind","page-discovered","page",page,"route",route,"visited",visited.size(),"modelCalls",budget.calls()));
-            if(visited.size()>=maxPages) break;
             var current=engine.observe("page",deadline);Failure.require(current.complete(),"LOCATOR_INCOMPLETE","Incomplete discovery observation");
             var navigation=engine.navigationRoutes(current,deadline);
+            eligible.addAll(navigation.values());
+            // Inspect the last page's links too: reaching the cap must not hide known remaining work.
+            if(visited.size()>=maxPages) break;
+            var unqueued=navigation.values().stream().filter(r -> !queued.contains(r)).distinct().toList();
+            candidateLimitReached|=unqueued.size()>100;
+            Set<String> seenCandidates=new HashSet<>();
             List<Map<String,Object>> candidates=current.nodes().stream().filter(n -> navigation.containsKey(n.id()) && !queued.contains(navigation.get(n.id())))
+                .filter(n -> seenCandidates.add(navigation.get(n.id())))
                 .limit(100).map(n -> Map.<String,Object>of("route",navigation.get(n.id()),"target",n.target())).toList();
             if(candidates.isEmpty()) continue;
             var response=model.complete(new ModelClient.Request("discover-routes",
@@ -74,7 +82,18 @@ public final class UiExplorer {
                 if(queued.add(selected)) queue.addLast(selected);
             }
         }
-        events.accept(Map.of("kind","discovery-completed","pages",visited.size(),"modelCalls",budget.calls(),"pendingPages",queue.size()));
+        eligible.removeAll(visited);
+        var summary=new LinkedHashMap<String,Object>();summary.put("kind","discovery-completed");summary.put("schemaVersion",1);
+        summary.put("pages",visited.size());summary.put("maxPages",maxPages);summary.put("modelCalls",budget.calls());summary.put("pendingPages",queue.size());
+        summary.put("coverageKind","navigation-presence");summary.put("applicationCoverageComplete",false);
+        summary.put("stopReason",eligible.isEmpty()?"NO_MORE_ELIGIBLE_ROUTES":visited.size()>=maxPages?"PAGE_LIMIT":"MODEL_SELECTION_STOPPED");
+        summary.put("visitedRoutes",List.copyOf(visited));summary.put("checkpoints",checkpoints);
+        summary.put("remainingRouteCount",eligible.size());summary.put("remainingRoutes",eligible.stream().limit(200).toList());
+        summary.put("remainingRoutesTruncated",eligible.size()>200);summary.put("candidateLimitReached",candidateLimitReached);
+        summary.put("excludedScope",List.of("business outcomes","forms and action buttons","hidden menus and dialogs","record destinations","permissions across personas"));
+        summary.put("nextStep",eligible.isEmpty()?"Review forms, dialogs, business outcomes and other personas as explicit supplied cases.":
+            "Continue from a listed remaining route or increase --max-pages within 1..50; use supplied cases for business workflows.");
+        events.accept(summary);
         return new CaseRecipe(1,id,Json.hash(namespace),engine.capabilityVersion(),startRoute,steps);
     }
 }

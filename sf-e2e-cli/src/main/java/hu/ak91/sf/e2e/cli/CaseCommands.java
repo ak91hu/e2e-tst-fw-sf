@@ -26,7 +26,9 @@ public final class CaseCommands {
         @Mixin SfE2eCli.Options options;
         @Option(names="--persona",defaultValue="default") Persona persona;
         @Option(names="--params",description="Private JSON object of runtime inputs and expected values. Values are not stored in the recipe.") Path params;
-        Map<String,String> parameters() {
+        Map<String,String> parameters() { return readParameters(params); }
+    }
+    static Map<String,String> readParameters(Path params) {
             if(params==null) return Map.of();
             var node=readJson(params);Failure.require(node.isObject() && node.size()<=200,"CASE_INVALID","Parameters must be a JSON object with at most 200 string values");
             Map<String,String> values=new TreeMap<>();
@@ -34,7 +36,47 @@ public final class CaseCommands {
                 CaseSpec.validateRef(e.getKey());Failure.require(e.getValue().isString() && e.getValue().asString().length()<=10000,"CASE_INVALID","Parameter values must be strings of at most 10000 characters");
                 values.put(e.getKey(),e.getValue().asString());
             });return Map.copyOf(values);
+    }
+    @Command(name="validate-case",mixinStandardHelpOptions=true,description="Validate a supplied specification and its runtime values offline. No configuration, browser or model required.")
+    public static final class Validate implements Callable<Integer> {
+        @Option(names="--spec",required=true,description="Structured case specification, not a learned recipe.") Path spec;
+        @Option(names="--params",description="Private JSON runtime inputs and expected values.") Path params;
+        @Spec picocli.CommandLine.Model.CommandSpec command;
+        public Integer call() {
+            var supplied=readSpec(spec);var values=readParameters(params);validateSpecParams(supplied,values);
+            command.commandLine().getOut().println(Json.string(Map.of("status","VALID","caseId",supplied.id(),"steps",supplied.steps().size(),
+                "assertions",supplied.steps().stream().filter(s -> CaseSpec.assertion(s.kind())).count(),"requiredParameters",requiredParams(supplied),
+                "uiVerified",false,"nextStep","Review intent, then use learn-case --spec with target configuration and runtime parameters.")));
+            return 0;
         }
+    }
+    @Command(name="plan-case",mixinStandardHelpOptions=true,description="Translate text into an editable specification using AI. No target login, browser, actions or locator writes.")
+    public static final class Plan implements Callable<Integer> {
+        @Mixin SfE2eCli.Options options;
+        @Option(names="--instructions",required=true,description="UTF-8 case with explicit actions and expected results.") Path instructions;
+        @Option(names="--id",required=true) String id;
+        @Option(names="--route",required=true) String route;
+        @Option(names="--params",description="Private JSON runtime inputs and expected values.") Path params;
+        @Option(names="--output",required=true,description="New editable specification JSON; TST_ is added to its filename. This is not a verified recipe.") Path output;
+        public Integer call() {
+            output=preparedOutput(output);requireNewOutput(parameterOutput(output));id=CaseNames.generated(id);FrameworkConfig.validateRoute(route);
+            String text=readText(instructions,40000);Failure.require(!text.isBlank(),"CASE_INVALID","Test instructions are empty");
+            var values=new TreeMap<>(readParameters(params));var config=options.config("mapping");
+            Failure.require(config.profile().equals("mapping"),"CONFIG_INVALID","plan-case requires the mapping profile");
+            var secrets=new SecretRegistry();var model=AiWorkflowClient.create(config.agent(),secrets,e -> {});
+            var deadline=Deadline.after(Duration.ofSeconds(Math.min(config.execution().testTimeoutSeconds(),config.agent().actTimeoutSeconds())));
+            var plan=new CasePlanner(model,config.agent(),secrets).plan(id,route,text,values.keySet(),deadline);
+            values.putAll(plan.parameters());return savePlan(output,plan.spec(),values);
+        }
+    }
+    static int savePlan(Path output,CaseSpec supplied,Map<String,String> values) {
+        validateSpecParams(supplied,values);requireNewOutput(output);requireNewOutput(parameterOutput(output));
+        if(!values.isEmpty()) Json.write(parameterOutput(output),values);
+        Json.write(output,supplied);
+        System.out.println("Editable specification (UI not verified): "+output.toAbsolutePath());
+        if(!values.isEmpty()) System.out.println("Private runtime parameters: "+parameterOutput(output).toAbsolutePath());
+        System.out.println("Review the specification and expected results; validate-case, then learn-case --spec to create a verified recipe.");
+        return 0;
     }
     @Command(name="learn-case",mixinStandardHelpOptions=true,description="Learn a supplied JSON/text test case with AI; save a verified recipe for model-free replay.")
     public static final class Learn implements Callable<Integer> {
@@ -50,8 +92,7 @@ public final class CaseCommands {
             var params=new TreeMap<>(input.parameters());CaseSpec supplied=null;String text=null;
             if(spec!=null) {
                 Failure.require(id==null && route==null,"CASE_INVALID","--id/--route are supplied by --spec");
-                try { supplied=Json.MAPPER.treeToValue(readJson(spec),CaseSpec.class); }
-                catch(Failure e) { throw e; } catch(Exception e) { throw new Failure("CASE_INVALID","Case specification has invalid or unknown fields"); }
+                supplied=readSpec(spec);
                 validateSpecParams(supplied,params);id=supplied.id();route=supplied.startRoute();
             } else {
                 requireNewOutput(parameterOutput(output));
@@ -132,6 +173,7 @@ public final class CaseCommands {
             if("case-plan-ready".equals(event.get("kind"))) state.put("trendScope",Json.hash(event.get("plan")));
             if("case-replay-plan".equals(event.get("kind"))) state.put("trendScope",Json.hash(event.get("steps")));
             if("discovery-plan-ready".equals(event.get("kind"))) state.put("trendScope",Json.hash(event));
+            if("discovery-completed".equals(event.get("kind"))) state.put("discovery",secrets.redactTree(Json.MAPPER.valueToTree(event)));
             state.put("lastEvent",secrets.redactTree(Json.MAPPER.valueToTree(event)));Json.write(journal,state);
         };
         Json.write(journal,state);
@@ -185,12 +227,19 @@ public final class CaseCommands {
         }
         if(output!=null) System.out.println("Verified recipe: "+output.toAbsolutePath());
         if(state.containsKey("parameterFile")) System.out.println("Private runtime parameters: "+state.get("parameterFile"));
+        if(state.containsKey("discovery")) System.out.println("Discovery scope (navigation presence only): "+Json.string(state.get("discovery")));
         System.out.println("Case "+id+" PASSED; model calls="+state.get("modelCalls"));return 0;
     }
     static void validateSpecParams(CaseSpec spec,Map<String,String> params) {
         var validation=spec.steps().stream().map(s -> new CaseRecipe.Step(s.kind(),CaseSpec.targeted(s.kind())?"validation":null,CaseSpec.targeted(s.kind())?"validation":null,s.route(),s.valueRef(),s.recordNameRef())).toList();
-        Set<String> required=new HashSet<>();spec.steps().forEach(s -> { if(s.valueRef()!=null) required.add(s.valueRef());if(s.recordNameRef()!=null) required.add(s.recordNameRef()); });
-        CaseRecipe.validateParams(required,params,validation);
+        CaseRecipe.validateParams(requiredParams(spec),params,validation);
+    }
+    private static Set<String> requiredParams(CaseSpec spec) {
+        Set<String> required=new TreeSet<>();spec.steps().forEach(s -> { if(s.valueRef()!=null) required.add(s.valueRef());if(s.recordNameRef()!=null) required.add(s.recordNameRef()); });return required;
+    }
+    private static CaseSpec readSpec(Path file) {
+        try { return Json.MAPPER.treeToValue(readJson(file),CaseSpec.class); }
+        catch(Failure e) { throw e; } catch(Exception e) { throw new Failure("CASE_INVALID","Case specification has invalid or unknown fields; supply {id,startRoute,steps} ending in an explicit assertion"); }
     }
     private static void requireMapping(FrameworkConfig config) {
         Failure.require(config.profile().equals("mapping"),"CONFIG_INVALID","Discovery/learning requires the mapping profile");
