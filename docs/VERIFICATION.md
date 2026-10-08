@@ -4,6 +4,7 @@
 
 ## Contents
 
+- [October 8 reference practice audit](#october-8-reference-practice-audit)
 - [October 8 case usability review](#october-8-case-usability-review)
 - [October 8 agent documentation review](#october-8-agent-documentation-review)
 - [October 8 reliability review](#october-8-reliability-review)
@@ -11,6 +12,16 @@
 - [Completion audit](#completion-audit)
 - [What the evidence does and does not establish](#what-the-evidence-does-and-does-not-establish)
 - [Live org validation](#live-org-validation)
+
+## October 8 reference practice audit
+
+The [pinned TesterArmy comparison](REFERENCE_PRACTICES.md) inventories 52 public documentation topics and maps 28 applicable practices to this framework's source and checks, with explicit non-parity/product gaps. Corrections enforce immutable strict agent cache behavior, original uncertain-dispatch errors, unique/complete field identity before mutation, configured live judge/wait budgets and state-change-only wait decisions. Redaction covers known escaped/case/whitespace forms and bounded trailing prefixes. Semantic controls omit inert/accessibility-hidden ancestry while pixel masks still protect painted content and PII labels. PNGs are masked in memory after stable before/after geometry/coverage checks. Recipe/cache schemas and checksums remain unchanged.
+
+Before correction, the new secret suite failed three checks, the agent probe failed five, a repeated-document pixel probe returned visible secret pixels, and an ambiguous live field was mutated once before verification rejected it. The corrected probes pass. The final focused pixel run passes all 28 `EngineHarnessIT`/`RoadmapHarnessIT` executions, including actual closed-root secret pixels on Chromium/Firefox/WebKit, hidden painted PII and withholding changing geometry. All 20 `AgentReplayTest` checks pass, including zero mutation for ambiguous live identity. Optional local logs: `.tools/reference-audit-before.log`, `.tools/reference-agent-before.log`, `.tools/reference-masking-debug2.log`, `.tools/reference-ambiguous-before.log`, `.tools/reference-pixel-final.log` and `.tools/reference-agent-final.log`.
+
+The final complete reactor passed `mvnw.cmd -B -ntp verify -Pchecks` on Temurin 27+35 in 5 minutes 21 seconds: **319 checks in 52 suites, comprising 258 unit/component and 61 real-browser executions**, with zero failures/errors/skips. Receipt: `.tools/reference-acceptance.log`; computed inventory: `.tools/reference-acceptance-inventory.json`. The earlier full 318-check run and subsequent focused unique-field proof are retained in `.tools/reference-audit-final.log` and `.tools/reference-agent-final.log`; repeated executions of the same check are not counted twice. The empty consumer Java workspace remains unchanged. All ten Node adapter/collector/budget checks pass. These are synthetic/local framework checks, not live-org or hosted CI certification.
+
+The packaged Java 21 CLI prints every one of its 22 public Markdown topics through `guide --list` / `guide <topic>` from an isolated directory with no YAML/credentials or source checkout. The process smoke caught and corrected missing output flushing before CLI exit. The jar bundles the public root/docs Markdown and excludes ignored private/reference directories. A Java 21 real-Chromium smoke also verifies case-folded/truncated secret text, repeated document replacement and actual pixel masking without masking the unrelated public control. Optional local receipts: `.tools/reference-guide-java21.json`, `.tools/ReferenceJava21Smoke.java` and `.tools/reference-java21-pixels.log`. Ignored audit receipts and the reference checkout are not prerequisites for another checkout.
 
 ## October 8 case usability review
 

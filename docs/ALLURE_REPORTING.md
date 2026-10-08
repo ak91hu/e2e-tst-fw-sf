@@ -43,6 +43,8 @@ evidence:
 
 Set `screenshotsAfterSteps: false` to omit additional step/action images; required start/completion and safe failure evidence remain active. Add the target app's sensitive labels to `piiLabels`. Existing credential and secret masking applies to every capture. Login screens and unsafe/unobservable UI are excluded. When a failure occurs before a usable page exists, diagnostics are retained without inventing a screenshot.
 
+Browser PNGs mask the actual returned pixels using outward-rounded sensitive rectangles in viewport CSS coordinates, including approved frames and tracked closed roots. The engine checks rectangles and root/frame coverage before and after capture; changes or missing geometry fail as `EVIDENCE_WITHHELD`. The unmasked buffer stays in memory and is never published. Inert/accessibility-hidden content can still be painted and is therefore included in mask detection. No browser overlay or application DOM modification is required. Known transformed/truncated secret matching and its limits are documented in [the evidence contract](IMPLEMENTATION.md#evidence-and-boundaries).
+
 PNG ownership and SHA-256 checks are retained. A completion screenshot records the final UI state; the passing verdict still requires subsequent quality/evidence gates. Browser errors delivered during completion capture can fail the case, and defects delivered during original-failure capture remain secondary diagnostics. Screenshot failure after an interaction does not justify repeating a dispatched business action. Keep reports private when application labels or visible business data require it.
 
 ## Files and commands

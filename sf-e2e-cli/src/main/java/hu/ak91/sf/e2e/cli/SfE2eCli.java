@@ -17,7 +17,7 @@ import java.time.*;
 import java.util.concurrent.Callable;
 
 @Command(name="sf-e2e",mixinStandardHelpOptions=true,version="1.0.0-SNAPSHOT",
-    description="Java Salesforce UI mapping and self-healing framework.",subcommands={ImpactCommands.class,ComponentCommands.class,ReleaseCommands.class,SuiteCommands.Run.class,SuiteCommands.Validate.class,CaseCommands.Plan.class,CaseCommands.Validate.class,CaseCommands.Learn.class,CaseCommands.Discover.class,CaseCommands.Replay.class,SfE2eCli.MapUi.class,SfE2eCli.InspectUi.class,SfE2eCli.VerifyUi.class,SfE2eCli.Locators.class,SfE2eCli.ListCases.class,SfE2eCli.Run.class,SfE2eCli.Doctor.class,SfE2eCli.Cache.class,SfE2eCli.Report.class,SfE2eCli.Data.class})
+    description="Java Salesforce UI mapping and self-healing framework.",subcommands={GuideCommand.class,ImpactCommands.class,ComponentCommands.class,ReleaseCommands.class,SuiteCommands.Run.class,SuiteCommands.Validate.class,CaseCommands.Plan.class,CaseCommands.Validate.class,CaseCommands.Learn.class,CaseCommands.Discover.class,CaseCommands.Replay.class,SfE2eCli.MapUi.class,SfE2eCli.InspectUi.class,SfE2eCli.VerifyUi.class,SfE2eCli.Locators.class,SfE2eCli.ListCases.class,SfE2eCli.Run.class,SfE2eCli.Doctor.class,SfE2eCli.Cache.class,SfE2eCli.Report.class,SfE2eCli.Data.class})
 public final class SfE2eCli implements Runnable {
     @Spec CommandLine.Model.CommandSpec spec;
     public void run() { spec.commandLine().usage(System.out); }

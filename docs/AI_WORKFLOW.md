@@ -77,6 +77,10 @@ JUnit creates one workflow per case context, shared across its personas. Its bud
 
 ## Savings that preserve the oracle
 
+The optional `SfAgent` additionally enforces local step limits with custom model implementations: `act` requires complete scope observations and a unique semantic field identity before mutation, judgments use the configured action deadline capped at 90 seconds, and `waitFor` is bounded by caller/attempt/action deadlines, at most ten/configured calls and the configured charged-token allowance. A response is charged and deadline-checked before its verdict is accepted. The wait digest includes route, controls, text/value, disabled/checked state and attributes; transient capture/node IDs do not trigger repeated model judgments. These local limits complement the shared workflow budget.
+
+Agent cache strictness is independent of locator strictness. Strict agent recordings never publish, evict or invalidate disk entries even with read-write cache configured. Known identity/precondition/end mismatches may hand off only in non-strict mode; uncertain dispatched action errors stop with their original code. Only a proven pre-dispatch `NODE_STALE` can justify another live decision. Replay-stop and proof-publication events explain the reason, completed actions and write disposition. See the [reference audit](REFERENCE_PRACTICES.md) for regression evidence and the limits of feature parity.
+
 1. Semantic UI projection excludes input values and unnecessary business text before discovery.
 2. A target already learned from the exact same instruction/scope/record reference is reused only after fresh strict resolution, permitted-role checks and unique identity matching. No repair/AI advice is allowed in this shortcut. Changed context or identity falls back to fresh learning; incomplete evidence fails.
 3. Read-only response reuse requires an identical request/schema/params/route/node IDs/semantic controls/attributes/states. Only observation timestamps/revisions are excluded from the key. The in-memory cache is bounded to 256 entries and ends with the workflow instance. A new run does not reuse provider judgments.

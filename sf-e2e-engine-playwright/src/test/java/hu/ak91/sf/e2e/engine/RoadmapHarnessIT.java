@@ -20,11 +20,13 @@ class RoadmapHarnessIT {
         var c=FrameworkConfig.defaults();return new FrameworkConfig(1,"roadmap","checks",new FrameworkConfig.Org("generic","auto",origin,List.of(),1,""),new FrameworkConfig.Ui("en","en-US","USD","UTC",800,600,browser,browser.equals("chromium")?"cdp":"tracked",""),c.auth(),c.personas(),c.execution(),c.agent(),c.cache(),c.retention(),c.evidence(),c.report());
     }
     @ParameterizedTest @ValueSource(strings={"chromium","firefox","webkit"})
-    void everyBrowserHasFreshResolutionClosedShadowAndMaskedEvidence(String browser) {
+    void everyBrowserHasFreshResolutionClosedShadowAndMaskedEvidence(String browser) throws Exception {
         var c=config("",browser);var d=deadline();var secret=new SecretRegistry();secret.register("PRIVATE_SENTINEL");
         try(var engine=new PlaywrightEngine(c,secret,d)) {
-            engine.setHarnessHtml("<label for=x>Field</label><input id=x><button>Save</button><div id=host></div>");engine.harnessScript("document.querySelector('#host').attachShadow({mode:'closed'}).innerHTML='<button>Closed action</button>'");
+            engine.setHarnessHtml("<label for=x>Field</label><input id=x><button>Save</button><div id=host></div>");engine.harnessScript("document.querySelector('#host').attachShadow({mode:'closed'}).innerHTML='<button>Closed action</button><input style=\"position:absolute;left:10px;top:140px;width:220px;height:25px\" value=PRIVATE_SENTINEL>'");
             engine.action("fill",SemanticTarget.label("Field","page"),"value",d);assertEquals("value",engine.resolve(SemanticTarget.label("Field","page"),engine.observe("page",d)).value());engine.action("click",SemanticTarget.role("button","Closed action","page"),null,d);assertTrue(engine.captureMaskedPng(d).length>100);
+            var image=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(engine.captureMaskedPng(d)));
+            assertEquals(0xff00ff,image.getRGB(20,150)&0xffffff,"Repeated captures must mask closed-root pixels in "+browser);
             var old=engine.observe("page",d);engine.observe("page",d);assertEquals("NODE_STALE",assertThrows(Failure.class,() -> engine.perform(new UiEngine.Action("click",old.nodes().getFirst().id(),null),old,d)).code());
             engine.harnessScript("(() => {const previous=Element.prototype.attachShadow;Element.prototype.attachShadow=function(options){return previous.call(this,options)};})()");assertEquals("EVIDENCE_WITHHELD",assertThrows(Failure.class,() -> engine.captureMaskedPng(d)).code());
         }

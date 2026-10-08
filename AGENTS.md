@@ -20,6 +20,8 @@ This repository is a reusable Salesforce UI automation framework. Keep framework
 - Retry only a proven pre-dispatch stale-node rejection. Once a business mutation has been dispatched, retain uncertain outcomes and never blindly repeat the mutation.
 - Keep Playwright calls and cleanup on the runtime's owner thread. Reuse browser processes only with fresh isolated contexts. Preserve attempt budgets and cleanup on failed initialization and repeated closure.
 - Preserve exact origin/frame boundaries, identity confidence, ambiguity rejection, repository integrity and optimistic revisions. Incomplete observation cannot justify repair or absence.
+- Strict agent cache replay cannot publish, evict or invalidate recordings even with read-write configured. Preserve uncertain dispatched failure codes; keep live judges independent of the acting ledger and bounded by calls, tokens and configured deadlines.
+- Browser evidence masks painted sensitive content even when semantic controls omit inert/accessibility-hidden subtrees. Validate mask geometry/coverage across capture and publish only the pixel-masked buffer; uncertain coverage must withhold the PNG.
 - Finalize verdicts after user teardown; class/container failures affect results and dependency release. Consumer Java execution goes through `RunCoordinator`, not an uncoordinated Jupiter launch.
 - Retain every selected dataset outcome and its provenance. Required evidence, journals, browser quality and report integrity remain part of the final verdict.
 - Preserve existing recipe/checksum compatibility. Capability, schema or namespace changes need explicit migration/remapping behavior and regression evidence.
@@ -40,5 +42,7 @@ This repository is a reusable Salesforce UI automation framework. Keep framework
 Public documentation, framework messages and configuration comments use English. Localized app/test fixtures may use other languages.
 
 When behavior changes, update the owning guide and any affected README/configuration examples. Explain the trigger, resulting behavior, compatibility implications and exact verification scope. New guides must appear in [docs/README.md](docs/README.md); maintain local links and heading anchors.
+
+Public root/docs Markdown is bundled with the CLI. When adding a guide, expose an explicit safe topic in `GuideCommand` and keep `GuideCommandTest`'s all-topic read check passing. `guide --list` works without a checkout/config; the [reference audit](docs/REFERENCE_PRACTICES.md) records the pinned upstream comparison and explicit feature gaps.
 
 A handoff should identify the changed files, completed checks, remaining work and any environment-dependent limitation. Label synthetic/local checks, historical receipts and live target execution accurately. Do not claim hosted CI, private org compatibility, production throughput or paid-provider savings from local fixture results.

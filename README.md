@@ -63,6 +63,16 @@ Start with [AGENTS.md](AGENTS.md) for repository invariants and the maintenance 
 
 Inspect the current worktree before editing and preserve existing changes. Framework regressions use synthetic fixtures in implementation modules; `sf-e2e-tests` remains empty. Target configuration, maps, recipes, values and business tests are supplied by consuming projects.
 
+The packaged CLI also supplies its matching public guides offline, without a checkout, YAML file, target session or model credentials:
+
+```powershell
+java -jar sf-e2e-cli/target/sf-e2e.jar guide --list
+java -jar sf-e2e-cli/target/sf-e2e.jar guide cases
+java -jar sf-e2e-cli/target/sf-e2e.jar guide best-practices
+```
+
+`guide` alone prints this README. The topic index names the source paths; relative links in printed Markdown are source-checkout links. Use [the pinned TesterArmy audit](docs/REFERENCE_PRACTICES.md) for practice-to-source/test traceability, corrected faults and explicit product gaps.
+
 Maven `test` runs unit/component checks; real-browser harnesses require `verify -Pchecks` and installed browsers. Maven `-Pchecks` selects build bindings, while runtime YAML/CLI `profile: checks` is a separate concept. A skipped-test package, missing selected suite or dated passing receipt does not establish the current change's correctness. Documentation-only maintenance normally needs the link/language check and `git diff --check`; changed executable examples also need semantic/API validation.
 
 ## Architecture
@@ -733,6 +743,7 @@ Framework checks do not certify target-app business coverage. Maintain a project
 | Command | Purpose | AI required |
 | --- | --- | --- |
 | `doctor` | Validate runtime/configuration; explicit live profiles also check credential references without login | Only checks model configuration when the selected profile needs it |
+| `guide --list`, `guide <topic>` | Read the public Markdown bundled with this CLI; no config or checkout needed | No |
 | `list --json` | Inspect explicitly supplied Java cases/dependencies; empty template returns `[]` | No |
 | `learn-case` | Learn a JSON/text case and save a verified recipe | Yes |
 | `plan-case` | Translate text into an editable specification; no target login/browser | Model only |
@@ -981,7 +992,7 @@ The framework is org-independent and configured per deployment. Browser automati
 
 No claim is made that every Salesforce edition, app, customization, authentication policy and UI combination has been tested. See [implementation](docs/IMPLEMENTATION.md) and [verification](docs/VERIFICATION.md) for the checks actually performed.
 
-The latest recorded full verification, on **October 8, 2026**, passed **302 internal checks in 50 suites**: 244 unit/component checks and 58 real-browser checks, with zero failures/errors/skips. It covers change-impact selection, trends, AI budgets, component/release verdicts, POM/healing, recipe compatibility, JUnit lifecycle and Allure integrity. The usability regressions additionally check browser-free planning, offline case/value validation, protected artifacts and discovery frontier/stop reasons; reliability checks cover changing UI state, asynchronous selection, attempt deadlines and failed/repeated runtime cleanup. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** passed. This dated inventory is not a claim that checks were rerun for every later documentation edit; use [VERIFICATION.md](docs/VERIFICATION.md) and fresh command output for the actual scope. These are implementation receipts, not hosted CI or private-org/device certification.
+The latest recorded full verification, on **October 8, 2026**, passed **319 distinct internal checks in 52 suites**: 258 unit/component checks and 61 real-browser checks, with zero failures/errors/skips. It covers change-impact selection, trends, AI budgets, component/release verdicts, POM/healing, recipe compatibility, JUnit lifecycle and Allure integrity. The reference audit additionally checks strict cache immutability, pre-dispatch ambiguity/completeness, uncertain action failures, bounded state-sensitive waits, transformed secrets, actual closed-root/inaccessible PII pixels and withheld changing coverage. The usability regressions check browser-free planning, offline case/value validation, protected artifacts and discovery frontier/stop reasons; reliability checks cover changing UI state, asynchronous selection, attempt deadlines and failed/repeated runtime cleanup. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** passed. This dated inventory is not a claim that checks were rerun for every later documentation edit; use [VERIFICATION.md](docs/VERIFICATION.md) and fresh command output for the actual scope. These are implementation receipts, not hosted CI or private-org/device certification.
 
 See the [requirement and best-practice audit](docs/REQUIREMENTS.md) for the implementation/evidence behind each requested capability.
 
@@ -1012,4 +1023,4 @@ The [development implementation ledger](docs/ROADMAP_IMPLEMENTATION.md) maps all
 | [Test structure review](docs/TEST_STRUCTURE_REVIEW.md) | Coordinated JUnit execution and corrected selection/lifecycle behavior |
 | [Reliability review](docs/RELIABILITY_REVIEW.md) | Official best practices, readiness state, asynchronous multi-select, attempt budgets and failed/repeated runtime cleanup |
 
-The design incorporates the supplied [semantic locator](https://e2e.tester.army/docs/locators), [cache](https://e2e.tester.army/docs/cache), [exploration](https://e2e.tester.army/docs/explore), [security](https://e2e.tester.army/docs/security) and [CI](https://e2e.tester.army/docs/ci) practices. Cached actions and agent judgments remain separate from the model-free locator API.
+The design incorporates the supplied [semantic locator](https://e2e.tester.army/docs/locators), [cache](https://e2e.tester.army/docs/cache), [exploration](https://e2e.tester.army/docs/explore), [security](https://e2e.tester.army/docs/security) and [CI](https://e2e.tester.army/docs/ci) practices. The [pinned reference audit](docs/REFERENCE_PRACTICES.md) maps 28 applicable practices to source/checks, records corrected faults and explicitly separates missing product integrations from framework practices. Cached actions and agent judgments remain separate from the model-free locator API.

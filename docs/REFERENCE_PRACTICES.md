@@ -1,0 +1,100 @@
+# TesterArmy reference practice audit
+
+[Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
+
+This audit compares the reusable Java framework with [tester-army/e2e](https://github.com/tester-army/e2e), using the public documentation and selected implementation contracts at [revision 7980bb3](https://github.com/tester-army/e2e/tree/7980bb3e34057d371831c188711bc2cb9cf382a9). The reviewed reference was fetched on October 8, 2026. This is a pinned implementation comparison, not a claim that every reference API, integration or future practice is implemented here.
+
+## Contents
+
+- [Scope and interpretation](#scope-and-interpretation)
+- [Applicable practices and evidence](#applicable-practices-and-evidence)
+- [Corrections from this audit](#corrections-from-this-audit)
+- [Intentional differences and product gaps](#intentional-differences-and-product-gaps)
+- [Agent workflow and acceptance](#agent-workflow-and-acceptance)
+- [Recheck after upstream changes](#recheck-after-upstream-changes)
+
+## Scope and interpretation
+
+The reference has 52 public MDX documentation pages, covering core concepts, agents, models, cache, security, authentication, debugging, exploration, tools/executors, web/mobile/API, configuration, engines, CI, hosted services and migrations. The audit inventories those topics and examines the contracts relevant to this Java/Salesforce framework. Selected source checks include reference cache decisions/recording and security boundaries; local implementation claims are tied to concrete classes and regression suites below. A reference feature is not automatically a universal best practice.
+
+The reusable framework supplies execution mechanisms. The consuming project supplies routes, labels, personas, data, expected business outcomes, authorization and application-specific verification charters. No reference example business case or customer org configuration is copied into this distribution. The reference checkout under ignored `.reference/` is optional audit evidence and is never built or executed as part of framework acceptance.
+
+## Applicable practices and evidence
+
+| Practice / primary reference | Local implementation | Verification / limit |
+| --- | --- | --- |
+| One bounded goal with an explicit outcome; [core concepts](https://e2e.tester.army/docs/core-concepts) | `CaseSpec` requires bounded supported steps ending in a deterministic assertion; `SfAgent` requires independent `UiVerification` proof | `CaseRecipeTest`, `CaseLearnerTest`, `AgentReplayTest`; consumer chooses meaningful expectations |
+| Combine deterministic controls and AI intent; [core concepts](https://e2e.tester.army/docs/core-concepts) | Session page objects, structured/text learning, `SfTestContext` and optional scoped agent | Page object and cross-page case harnesses; saved recipes execute without AI |
+| Separate planning from application execution; [exploration](https://e2e.tester.army/docs/explore), [coding agents](https://e2e.tester.army/docs/coding-agents) | `plan-case` writes editable unverified intent, `validate-case` preflights offline, `learn-case` executes/validates | `CasePlannerTest`, `CaseCommandsTest`; planning is not proof of application correctness |
+| Prefer accessible roles/names and explicit scope; reject ambiguous controls; [locators](https://e2e.tester.army/docs/core-concepts#locators) | Semantic role/name/label/container, fingerprints and observed frame boundaries; no arbitrary nth-node guess | Healing, frame, named-scope and duplicate harnesses; incomplete identity never authorizes repair |
+| Exclude inaccessible/inert controls; [browser](https://e2e.tester.army/docs/browser) | Semantic visibility excludes `hidden`, `inert` and `aria-hidden=true` ancestry, including shadow hosts | `EngineHarnessIT`; painted secret content is still masked even when omitted from semantic controls |
+| Poll state instead of fixed business sleeps; [coding agents](https://e2e.tester.army/docs/coding-agents) | Bounded readiness, auto-waiting actions and exact assertion polling | `UiReadinessTest`, browser reliability checks; the engine's message-loop tick is not a readiness criterion |
+| Re-observe before using a control; [engine contract](https://e2e.tester.army/docs/writing-an-engine) | Fresh observations and owner-thread engine calls; locators store identities, never live DOM handles | Mapping/healing/readiness/resource regression suites |
+| Cache only independently verified actions; [caching](https://e2e.tester.army/docs/cache) | Agent traces need caller proof; complete recipes publish only after all actions, assertions and required completion gates | `AgentReplayTest`, case workflow/quality harnesses; no-op agent steps cannot acquire proof by passing alone |
+| Bind recordings to instruction, target context, persona and engine; [caching](https://e2e.tester.army/docs/cache) | Hashed agent keys, namespace-bound recipes/maps, engine capability gate, meaningful query identity | Core context, recipe preflight, route/record/unique-slot and wrong-persona checks |
+| Unique inputs use runtime slots; branching choices remain stable; [caching](https://e2e.tester.army/docs/cache) | `StepParam.unique` rebinding with collision rejection; recipe values are runtime references | `AgentReplayTest`; business data generation/setup remains explicit consumer code |
+| Read-only CI and strict recordings that never mutate storage; [strict cache](https://e2e.tester.army/docs/cache#fail-on-a-stale-recording) | CI defaults read-only; strict agent cache suppresses publication, eviction and pending invalidation even with read-write configured | Agent strict publication/deletion fault checks; `--strict-locators` is a separate locator contract |
+| Cache failures explain decisions; [caching](https://e2e.tester.army/docs/cache) | Replay stop events name the entry, reason and completed-action count; proof publication records write disposition | `AgentReplayTest`; an uncertain action error retains its original failure classification |
+| Judgments always inspect current evidence, without the acting ledger; [agent steps](https://e2e.tester.army/docs/agent-steps) | Live `assertThat`, `extract`, `waitFor`; exact deterministic recipe assertions are independently rerun | Agent judgment/extraction checks; no cached judgment is accepted as today's verdict |
+| Calls, tokens and time are bounded for every step; [agent budgets](https://e2e.tester.army/docs/agent-steps#cost) | Shared `AiWorkflowClient` physical-call/accounting policy; local agent budgets include wait tokens/calls and configured deadlines | AI budget/protocol suites and wait token/state regressions; custom providers must honor deadlines |
+| Skip redundant wait judgments only when semantic state is unchanged; [core concepts](https://e2e.tester.army/docs/core-concepts#assertions) | Shared semantic digest includes route, target, text, value, disabled/checked and attributes; excludes capture/node IDs | Readiness checks plus disabled-state wait fault; no extra judge for ephemeral IDs alone |
+| Closed model tools and app content as untrusted evidence; [security](https://e2e.tester.army/docs/security) | Closed JSON schemas, current observed node IDs, explicit action policies and runtime-value validation | Mapper/planner/protocol/agent policy tests; model text is never code, a selector or a shell command |
+| Mutation failures cannot grant unsafe replay; [engine errors](https://e2e.tester.army/docs/writing-an-engine) | Only engine-proven pre-dispatch `NODE_STALE` permits another decision; uncertain dispatch failures stop and retain their code | Live/replay uncertain-dispatch faults and deterministic no-double-click checks |
+| Complete observations precede mutation or absence; [security](https://e2e.tester.army/docs/security), [engine contract](https://e2e.tester.army/docs/writing-an-engine) | Agent scope membership/completeness guard; healing and negative assertions require coverage/identity evidence | Agent partial observation, core absence/count and frame/shadow checks |
+| Register secrets and redact transformed/truncated evidence; [redaction](https://e2e.tester.army/docs/security#redaction) | Secret references resolved on host; raw, escaped JSON/HTML, URL encodings, case/whitespace variants and bounded trailing prefixes masked; existing base64 masking retained | `SecretRegistryTest`, authentication checks, actual pixel/text masking harness; arbitrary transforms/split-node rendering are not certified |
+| Masks must cover actual painted sensitive content; [security](https://e2e.tester.army/docs/security) | PII/password/known-value rectangles across approved frames and tracked shadow roots, checked before/after capture and masked in returned PNG pixels; unproven/changed coverage withholds PNG | Pixel checks for transformed echoes, repeated document replacement, actual closed-root input pixels, inaccessible painted content and withheld changing geometry; private traces/downloads retain explicit private ownership |
+| Authentication state is a credential, isolated by identity; [authentication](https://e2e.tester.army/docs/authentication) | JWT or external storage state, validated origins, registered token values, fresh persona/context boundaries | Browser state/frontdoor/authentication tests; externally supplied session files remain caller-owned |
+| Every selected outcome and teardown failure affects the run; [test structure](https://e2e.tester.army/docs/core-concepts#structure), [CI](https://e2e.tester.army/docs/ci) | `RunCoordinator`, dependency closure, finalization after teardown/callback/container results; retained skipped rows | JUnit lifecycle, scheduling and dataset failure/aggregate checks |
+| Reports for people and agents; [debugging](https://e2e.tester.army/docs/debugging) | Redacted versioned JSON, permanent journals, timestamped Allure HTML, PNG attachments, quality summaries and integrity manifests | Reporting/integrity/quality suites; evidence is preserved across Maven clean |
+| Isolate workers, preserve failures and avoid blind whole-flow retries; [CI](https://e2e.tester.army/docs/ci) | Fresh contexts with bounded process reuse, dependency/resource-aware scheduling, zero automatic business retries | Worker/scheduler/lifecycle and three-browser reliability checks; no claim of device isolation on untested physical devices |
+| CI should keep artifacts and exclude secrets from untrusted PR jobs; [CI security](https://e2e.tester.army/docs/ci#model-credentials) | Credential-free PR framework checks, read-only GitHub permissions, separate manual protected live workflow and always-uploaded evidence | Checked workflow configuration; hosted CI is not claimed from local test receipts |
+| Deterministic API/component checks complement UI evidence; [API](https://e2e.tester.army/docs/api-testing) | Salesforce REST/schema oracles, owned fixture journals, pinned LWC/Jest and explicit release-layer adapters | Local HTTP/component/runner tests; the consumer defines schema, write ownership and expected values |
+| Ship offline guidance with the tool; [coding agents](https://e2e.tester.army/docs/coding-agents) | Public Markdown bundled in CLI; `guide --list` / `guide <topic>` require no checkout/config/credentials | `GuideCommandTest` validates every bundled topic; the packaged Java 21 CLI can print it from another directory |
+| Exploration is bounded and findings need reproducible proof; [explore](https://e2e.tester.army/docs/explore), [bug bashes](https://e2e.tester.army/docs/bug-bash) | Read-only visible-href discovery with checkpoint recipes, known remaining routes and explicit scope/stop reason | Discovery cap/model-stop/quality faults; arbitrary suspected business bugs are not certified by presence checks |
+
+## Corrections from this audit
+
+The audit reproduced missing transformed-secret masking and agent cache/wait/error-handling contracts with synthetic fault checks before correction. Strict read-write confirmation previously wrote a new entry; an enabled-state change could time out because the wait digest ignored `disabled`; a wait could pass above its configured token budget; a dispatched engine failure could lose its classification. The implementation now enforces those boundaries. Strict failure also preserves unconfirmed entries, and incomplete observations cannot authorize an agent mutation.
+
+An additional live-agent probe showed that a duplicated field could be changed once before end verification rejected the ambiguous identity. Scope validation now requires a unique semantic field identity before dispatch, matching the deterministic learning/replay boundary; the fault check requires zero mutations.
+
+Browser observations now omit inert/accessibility-hidden duplicates across shadow hosts, while screenshot masking still examines painted content. Secret matching happens before observation clipping and also protects long trailing prefixes after clipping. Patterns are compiled when a value is registered, rather than for every observed node. The CLI bundles the framework's own guides; no upstream source, examples, subscription implementation or private artifacts are packaged.
+
+The real pixel regression also exposed a browser masking overlay disappearing after document replacement while capture still returned an unmasked PNG. The engine now resolves sensitive rectangles in top-level viewport CSS coordinates, validates unchanged coverage across capture and masks the returned PNG in memory. It never returns/writes the unmasked buffer, mutates the application's DOM to mask evidence or retries a business operation. Unknown/changing coverage remains `EVIDENCE_WITHHELD`. See [the evidence contract](IMPLEMENTATION.md#evidence-and-boundaries).
+
+The coordinate contract follows Playwright's [main-frame-relative bounding boxes](https://playwright.dev/java/docs/api/class-locator#locator-bounding-box) and [CSS-scale screenshots](https://playwright.dev/java/docs/api/class-page#page-screenshot). Synthetic pixel checks additionally cover repeated capture, closed-root content on Chromium/Firefox/WebKit and configured PII labels under accessibility-hidden ancestry.
+
+Recipe, locator and agent cache document schemas/checksums are unchanged. Existing valid identities still load. Controls that were incorrectly exposed from inert/accessibility-hidden subtrees may now be unavailable; review/remap them against the actual actionable state instead of weakening ambiguity or absence rules. Masked control names/attributes are unsuitable durable identity: use a non-secret label and relearn that locator. Strict replay with stale identity remains a review failure and cannot rewrite storage.
+
+## Intentional differences and product gaps
+
+These are explicit boundaries, not implemented features hidden behind a best-practice claim:
+
+| Reference capability / convention | Framework position |
+| --- | --- |
+| Fully autonomous mutating exploration, multi-agent bug bashes and automatic repro generation | Discovery is bounded read-only navigation; business workflows use reviewed supplied intent. Consumer charters/data/oracles remain outside the framework. There is no built-in fan-out agent orchestrator. |
+| Built-in MCP server, browser session catalog and generated app-specific verification skill | Not supplied. Agents use checked-in `AGENTS.md`, bundled `guide`, CLI inspection/planning and versioned reports. |
+| AI pixel/coordinate actions and vision judgments | Not supplied. Semantic identity and exact deterministic/explicit live judgments are the supported paths. Unknown/ambiguous surfaces fail. |
+| Opaque UI secret-fill handles and screenshot prohibition after such a fill | Business agent params reject `SecretRef`; login occurs through JWT or external browser state. Arbitrary AI secret fills are not enabled. Known session-secret echoes are masked, but arbitrary transforms and values split across nodes need consumer review. |
+| Runner-generated encrypted reusable sessions | The framework consumes external authorized state and creates fresh isolated contexts; it does not export reusable session files. External state must be protected by the consuming project. |
+| Broad navigation across origins and unnamed positional fallback | Deliberately narrower exact-origin/frame, semantic uniqueness and identity rules are retained for Salesforce data isolation. |
+| Live handoff after an unexpected business assertion during saved-case replay | Deterministic recipes fail against the caller's unchanged expectation. Healing can repair identity; it cannot reinterpret business outcomes or construct a provider. |
+| Invalid agent cache files silently become misses | This framework retains explicit integrity failures instead of authorizing a new mutation from corrupt storage. Review/clear the agent cache deliberately; permanent journals are separate. |
+| CI retries and flaky-pass classification | Automatic business retries stay disabled. An explicit later rerun retains separate evidence and must use repeatable consumer data. |
+| CI sharding and `--last-failed` shorthand | Not implemented as CLI switches. Reviewed dataset/impact selection and bounded workers are available; no failure-selection or shard-merging parity is claimed. |
+| Playwright route mocking, arbitrary evaluation/init scripts and a generic app-server launcher | Internal harnesses use trusted synthetic HTML/services. No arbitrary model/browser script execution or consumer server launcher is exposed through the recipe grammar. |
+| Kernel/EAS hosted sessions, React Native/dev-server boot, subscription providers, PR-comment reporter | These are ecosystem integrations, not mandatory framework practices. Only documented engines/external adapters and the opt-in local subscription bridge are available. Nothing posts messages/comments automatically. |
+| Anonymous telemetry and feedback uploads | No telemetry or feedback upload is implemented. Network use comes from explicitly configured target/auth/model/external tools and build/report dependencies. |
+| TypeScript runner fixtures/Standard Schema/provider SDK API compatibility and migration commands | Java/JUnit, bounded JSON schema, Maven and the existing engine interfaces are retained; reference API parity is not promised. |
+
+## Agent workflow and acceptance
+
+1. Use `guide index` or the checked-in documentation index to choose the owning contract. `guide cases` explains the planning/learning/replay distinction; `guide best-practices` prints this audit.
+2. Obtain consumer-owned intent, runtime values, expected results and the authorized persona/session. Use plan/review/offline validation before UI learning where appropriate.
+3. For exploration, review the reported frontier and scope. For a suspected application defect, create an explicit consumer repro that verifies expected behavior; a tool limitation, missing seed or auth failure is not an application assertion failure.
+4. Use the affected implementation module's synthetic checks for maintenance. Run `verify -Pchecks` for real-browser acceptance and inspect the actual named suites/counts. Keep the consumer Java workspace empty.
+5. Preserve exact expected outcomes, uncertain mutation errors, strict/read-only storage and private evidence boundaries. Consult [verification](VERIFICATION.md) for the recorded result scope; local fixtures do not certify paid-model quality, every Salesforce org or hosted CI.
+
+## Recheck after upstream changes
+
+Fetch a new reference revision into an ignored directory and record its full SHA/date. Inventory the documentation topics and compare changed contracts before treating new APIs as best practices. Update this matrix with implementation/source and named checks for every adopted practice. Record missing product capabilities explicitly rather than labeling them implemented because a similar CLI exists. If behavior changes, preserve public schemas or document remapping/migration, add a meaningful synthetic fault check and rerun acceptance.

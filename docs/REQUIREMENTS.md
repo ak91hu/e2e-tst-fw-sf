@@ -12,6 +12,8 @@ The deliverable is a reusable Java Salesforce UI framework. Consumer business te
 
 ## Requested capabilities
 
+The [pinned TesterArmy reference audit](REFERENCE_PRACTICES.md) supplements this capability ledger with 28 applicable practices, their concrete source/checks, corrected faults and intentional product differences. `GuideCommandTest` verifies that every whitelisted public guide is bundled and readable without config/credentials; agent/cache/wait and secret/pixel regressions enforce the adopted execution and security boundaries. The audit does not claim TypeScript API, hosted service, MCP or autonomous mutating exploration parity.
+
 | Requirement | Implementation | Verification |
 | --- | --- | --- |
 | Empty framework, no bundled business cases | `sf-e2e-tests/src/test/java` contains only `.gitkeep`; classes are explicitly selected by the consumer; mapping/inspection need no case file | `SelectionPlannerTest`, `SfE2eCliTest`, CLI `list --json`, packaged-class inspection |

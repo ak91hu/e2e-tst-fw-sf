@@ -13,10 +13,13 @@ public record ActScope(String attemptId, String objectType, String recordId, Set
         fields=Set.copyOf(fields);
     }
     public void validate(Observation observation, Observation.Node node, String tool, String value, Map<String,StepParam> params) {
+        Failure.require(observation.complete() && observation.nodes().contains(node),"LOCATOR_INCOMPLETE","Agent actions require a complete current observation and an observed target");
         var expected=java.net.URI.create(route);var actual=java.net.URI.create(observation.route());
         Failure.require(Objects.equals(expected.getPath(),actual.getPath()) && (expected.getRawQuery()==null || Objects.equals(expected.getRawQuery(),actual.getRawQuery())),
             "RECORD_SCOPE_VIOLATION","Current route is outside the declared record edit scope");
         var target=node.target(); String label=target.label()!=null?target.label():target.name();
+        Failure.require(observation.nodes().stream().filter(candidate -> candidate.target().equals(target)).count()==1,
+            "TARGET_AMBIGUOUS","Agent field identity must be unique before mutation");
         Failure.require(!node.disabled() && container.equals(target.container()) && fields.contains(label),"POLICY_DENIED","Action target is outside declared fields");
         Failure.require(Set.of("fill","select","setChecked","press","scroll").contains(tool),"POLICY_DENIED","Agent cannot save, cancel, delete, navigate, or activate");
         String role=target.role();

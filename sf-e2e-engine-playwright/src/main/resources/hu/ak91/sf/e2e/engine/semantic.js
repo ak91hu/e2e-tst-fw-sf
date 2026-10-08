@@ -11,9 +11,17 @@
   Element.prototype.attachShadow = trackedAttach;
   const state = { nodes: new Map(), revision: 0, closedTracked: Element.prototype.attachShadow === trackedAttach };
   Object.defineProperty(state, 'closedTracked', {get: () => Element.prototype.attachShadow === trackedAttach});
-  const visible = e => {
+  const painted = e => {
     const style = getComputedStyle(e), box = e.getBoundingClientRect();
     return box.width > 0 && box.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+  };
+  const visible = e => {
+    if(!painted(e)) return false;
+    // Accessibility-hidden and inert ancestors do not supply actionable semantic controls, including shadow hosts.
+    for(let current=e;current;current=current.parentElement || current.getRootNode().host) {
+      if(current.hidden || current.inert || current.getAttribute('aria-hidden')==='true') return false;
+    }
+    return true;
   };
   function elements(root = document) {
     const out = [], seen = new Set(), roots = new Set();
@@ -27,15 +35,15 @@
     }
     walk(root); return out;
   }
-  const idref = (e, attr) => {
+  const idref = (e, attr, isVisible = visible) => {
     const root = e.getRootNode();
     return (e.getAttribute(attr) || '').split(/\s+/).filter(Boolean).map(id => {
       const found = root instanceof Document ? root.getElementById(id) : root.querySelector('#' + CSS.escape(id));
-      return found && visible(found) ? found.textContent.trim() : '';
+      return found && isVisible(found) ? found.textContent.trim() : '';
     }).join(' ').trim();
   };
-  const label = e => e.getAttribute('aria-label') || idref(e, 'aria-labelledby') ||
-    (e.labels ? [...e.labels].filter(visible).map(x => x.textContent.trim()).join(' ') : '');
+  const label = (e, isVisible = visible) => e.getAttribute('aria-label') || idref(e, 'aria-labelledby', isVisible) ||
+    (e.labels ? [...e.labels].filter(isVisible).map(x => x.textContent.trim()).join(' ') : '');
   const role = e => e.getAttribute('role') || (e.isContentEditable ? 'textbox' : '') ||
     ({ BUTTON:'button', SELECT:'combobox', TEXTAREA:'textbox', A:'link', DIALOG:'dialog', H1:'heading', H2:'heading', H3:'heading', H4:'heading', H5:'heading', H6:'heading' }[e.tagName]) ||
     (e.tagName === 'INPUT' ? ({checkbox:'checkbox',radio:'radio',number:'spinbutton',search:'searchbox',range:'slider'}[e.type] || 'textbox') : '');
@@ -65,7 +73,17 @@
     }
     throw Error('Unsupported observation scope');
   }
-  function secretPresent(text, secrets) { return secrets.some(s => s.length > 0 && text.includes(s)); }
+  function secretPresent(text, secrets) {
+    const collapsed = value => value.replace(/\s+/gu,' '), source=collapsed(String(text));
+    return secrets.some(secret => {
+      if (!secret.length) return false;
+      if (secret.length<6) return source.includes(secret);
+      const value=collapsed(secret).toLowerCase(), candidate=source.toLowerCase();
+      if(candidate.includes(value)) return true;
+      const minimum=Math.min(8,Math.ceil(value.length/2)), start=candidate.lastIndexOf(value.slice(0,minimum));
+      return start>=0 && candidate.length-start<value.length && value.startsWith(candidate.slice(start));
+    });
+  }
   const recordLink = e => {
     if(role(e) !== 'link') return false;
     if(/^[a-zA-Z0-9]{15}(?:[a-zA-Z0-9]{3})?$/.test(e.getAttribute('data-record-id') || e.getAttribute('data-recordid') || '')) return true;
@@ -106,7 +124,7 @@
       if (!visible(e)) continue;
       const r = role(e) || (!e.children.length ? 'text' : ''), l = norm(label(e) || e.getAttribute('placeholder')), text = (e.innerText || e.textContent || '').trim();
       if (!r && !e.matches('.slds-form-element__label,.slds-form-element__control')) continue;
-      const sensitive = e.type === 'password' || secretPresent(l + text + (e.value || ''), secrets) || pii.includes(l);
+      const sensitive = e.type === 'password' || [l,text,String(e.value ?? '')].some(value => secretPresent(value,secrets)) || pii.includes(l);
       const name = l || norm(text).slice(0, 500), value = sensitive ? '[REDACTED]' : (e.value ?? '');
       if (!name && !r) continue;
       const id = rev + '-' + (++total); state.nodes.set(id, e);
@@ -139,11 +157,11 @@
     state.nodes.clear(); const ids = []; let index = 0;
     const all = elements();
     for (const e of all) {
-      if (!visible(e)) continue;
+      if (!painted(e)) continue;
       // Lightning components may expose object/array values; visible text still needs masking.
-      const text = String(e.value ?? '') + ' ' + String(e.innerText || e.textContent || ''), l = norm(label(e));
+      const text = String(e.value ?? '') + ' ' + String(e.innerText || e.textContent || ''), l = norm(label(e,painted));
       if (e.type === 'password' || (e.tagName === 'INPUT' && e.autocomplete === 'one-time-code') ||
-          pii.includes(l) || secretPresent(text, secrets) && !elements(e).some(c => visible(c) && secretPresent(String(c.value ?? '') + ' ' + String(c.innerText || c.textContent || ''),secrets))) {
+          pii.includes(l) || secretPresent(text, secrets) && !elements(e).some(c => painted(c) && secretPresent(String(c.value ?? '') + ' ' + String(c.innerText || c.textContent || ''),secrets))) {
         const id = 'mask-' + (++index); state.nodes.set(id,e); ids.push(id);
       }
     }

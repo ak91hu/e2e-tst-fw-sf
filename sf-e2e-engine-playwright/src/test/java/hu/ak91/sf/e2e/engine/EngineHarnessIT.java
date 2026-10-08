@@ -78,11 +78,46 @@ class EngineHarnessIT {
     @Test void secretsInNormalAndClosedShadowInputsAreRedactedAndMasked() throws Exception {
         String secret="SENTINEL_PRIVATE_123";secrets.register(secret);
         engine.setHarnessHtml("<label for=p>Password</label><input id=p type=password value='"+secret+"'><div id=host></div><p>"+secret+"</p>");
-        engine.harnessScript("() => {const r=document.getElementById('host').attachShadow({mode:'closed'});r.innerHTML='<label for=x>Token</label><input id=x value=SENTINEL_PRIVATE_123>';}");
+        engine.harnessScript("() => {const r=document.getElementById('host').attachShadow({mode:'closed'});r.innerHTML='<label for=x>Token</label><input id=x style=\"position:absolute;left:10px;top:140px;width:220px;height:25px\" value=SENTINEL_PRIVATE_123>';}");
         assertFalse(Json.string(engine.observe("page",deadline)).contains(secret));
         byte[] png=engine.captureMaskedPng(deadline);var image=ImageIO.read(new ByteArrayInputStream(png));assertNotNull(image);
         int masked=0;for(int x=0;x<image.getWidth();x++) for(int y=0;y<image.getHeight();y++) if((image.getRGB(x,y)&0xffffff)==0xff00ff) masked++;
         assertTrue(masked>100,"Sensitive fields must have visible masking coverage");
+        assertEquals(0xff00ff,image.getRGB(20,150)&0xffffff,"Actual closed-shadow input pixels must be masked");
+    }
+    @Test void transformedAndTruncatedSecretEchoesAreMaskedInTextAndPixels() throws Exception {
+        secrets.register("Sentinel\n  private credential 123");
+        for(String echo:List.of("SENTINEL PRIVATE CREDENTIAL 123","sentinel private cred")) {
+            engine.setHarnessHtml("<span style='position:absolute;left:10px;top:10px;width:280px;height:30px'>"+echo+"</span>"+
+                "<button style='position:absolute;left:10px;top:80px'>Public control</button>");
+            String observed=Json.string(engine.observe("page",deadline));assertFalse(observed.contains(echo));assertTrue(observed.contains("Public control"));
+            var image=ImageIO.read(new ByteArrayInputStream(engine.captureMaskedPng(deadline)));
+            assertEquals(0xff00ff,image.getRGB(20,20)&0xffffff,"The secret's visible rectangle must be masked: "+echo);
+            assertNotEquals(0xff00ff,image.getRGB(20,90)&0xffffff,"Unrelated public controls must remain visible");
+        }
+    }
+    @Test void inertAndAccessibilityHiddenDuplicatesAreExcludedButVisibleSecretPixelsRemainMasked() throws Exception {
+        engine.close();var c=FrameworkConfig.defaults();var evidence=new FrameworkConfig.Evidence(2,List.of("Private field"));
+        var policy=new FrameworkConfig(1,c.projectId(),c.profile(),c.org(),c.ui(),c.auth(),c.personas(),c.execution(),c.agent(),c.cache(),c.retention(),evidence,c.report());
+        engine=new PlaywrightEngine(policy,secrets,deadline);
+        secrets.register("PRIVATE_PAINTED_SENTINEL");
+        engine.setHarnessHtml("<div inert><button>Action</button><div id=host></div></div>"+
+            "<div aria-hidden=true><button>Action</button><span style='position:absolute;left:10px;top:10px;width:280px;height:30px'>PRIVATE_PAINTED_SENTINEL</span>"+
+            "<label for=pii>Private field</label><input id=pii style='position:absolute;left:330px;top:10px;width:220px;height:25px' value=unregistered-personal-value></div>"+
+            "<button style='position:absolute;top:100px'>Action</button>");
+        engine.harnessScript("() => {document.getElementById('host').attachShadow({mode:'closed'}).innerHTML='<button>Action</button>';}");
+        var observation=engine.observe("page",deadline);
+        assertEquals(1,observation.nodes().stream().filter(n -> "Action".equals(n.target().name())).count());
+        assertNotNull(engine.resolve(SemanticTarget.role("button","Action","page"),observation));
+        var image=ImageIO.read(new ByteArrayInputStream(engine.captureMaskedPng(deadline)));
+        assertEquals(0xff00ff,image.getRGB(20,20)&0xffffff,"Accessibility omission cannot disable pixel masking");
+        assertEquals(0xff00ff,image.getRGB(340,20)&0xffffff,"Painted PII labels remain effective inside accessibility-hidden subtrees");
+    }
+    @Test void changingSensitiveGeometryWithholdsTheScreenshot() {
+        secrets.register("MOVING_PRIVATE_SENTINEL");
+        engine.setHarnessHtml("<span id=secret style='position:absolute;left:10px;top:10px;width:280px;height:30px'>MOVING_PRIVATE_SENTINEL</span>");
+        engine.harnessScript("() => {const e=document.getElementById('secret'),original=e.getBoundingClientRect.bind(e);e.getBoundingClientRect=() => {e.style.left=(parseFloat(e.style.left)+10)+'px';return original();};}");
+        assertEquals("EVIDENCE_WITHHELD",assertThrows(Failure.class,() -> engine.captureMaskedPng(deadline)).code());
     }
     @Test void unapprovedIframeWithholdsScreenshotAndMarksPartialObservation() {
         engine.setHarnessHtml("<p>Visible</p><iframe src='about:blank'></iframe>");

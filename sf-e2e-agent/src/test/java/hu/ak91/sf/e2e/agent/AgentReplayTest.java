@@ -28,12 +28,12 @@ class AgentReplayTest {
         assertThrows(Failure.class,() -> scope.validate(other,name,"fill","Új érték",Map.of("name",StepParam.unique("Új érték"))));
     }
     static final class Engine implements UiEngine {
-        String id=ID,value="Before";long revision;int mutations;boolean ambiguous,stale;
+        String id=ID,value="Before";long revision;int mutations;boolean ambiguous,stale,disabled,enableOnPoll,failAfterMutation;
         public String route() { return "https://org.develop.my.salesforce.com/lightning/r/Opportunity/"+id+"/edit?recordTypeId=type"; }
         public void open(String route,Deadline deadline) { throw new AssertionError("Agent must not navigate"); }
         public Observation observe(String container,Deadline deadline) {
             deadline.check();var target=new SemanticTarget("textbox","Opportunity Name","Opportunity Name",container);
-            List<Observation.Node> nodes=new ArrayList<>(List.of(new Observation.Node(++revision+"-name",target,"",value,false,false)));
+            List<Observation.Node> nodes=new ArrayList<>(List.of(new Observation.Node(++revision+"-name",target,"",value,disabled,false)));
             if(ambiguous) nodes.add(new Observation.Node(revision+"-other",target,"",value,false,false));
             nodes.add(new Observation.Node(revision+"-save",SemanticTarget.role("button","Save",container),"Save","",false,false));
             return new Observation(revision,Instant.now(),route(),nodes,false,"COMPLETE","SAFE",null);
@@ -44,11 +44,11 @@ class AgentReplayTest {
         }
         public void perform(Action action,Observation observation,Deadline deadline) {
             deadline.check();Failure.require(observation.revision()==revision && !stale,"NODE_STALE","Stale target");
-            if(action.kind().equals("fill")) { value=action.value();mutations++;revision++; } else throw new Failure("POLICY_DENIED","Only fill supported");
+            if(action.kind().equals("fill")) { value=action.value();mutations++;revision++;if(failAfterMutation) throw new Failure("ENGINE_FAILURE","Dispatch outcome is uncertain"); } else throw new Failure("POLICY_DENIED","Only fill supported");
         }
         public Map<String,String> readVisibleFields(Deadline deadline) { return Map.of("Opportunity Name",value); }
         public byte[] captureMaskedPng(Deadline deadline) { throw new UnsupportedOperationException(); }
-        public void poll(Deadline deadline) { deadline.check(); }
+        public void poll(Deadline deadline) { deadline.check();if(enableOnPoll) disabled=false; }
         public String capabilityVersion() { return "fake-v1"; }
         public void close() {}
     }
@@ -72,6 +72,54 @@ class AgentReplayTest {
     }
     private UiVerification proof(String attempt,String id,String name) {
         return UiVerification.compare(attempt,id,Map.of("Opportunity Name",name),Map.of("Opportunity Name",name),"route","current-evidence");
+    }
+    @Test void strictReadWriteModeCannotPublishOrInvalidateRecordings() {
+        var cache=new CacheStore(root.resolve("cache"));var key="a".repeat(64);
+        cache.put(key,List.of(new CacheStore.Action("fill",SemanticTarget.label("Name","edit-dialog"),"name",null)));
+        var engine=new Engine();var strict=agent(engine,script(),config("read-write",true),"attempt");
+        var result=act(strict,"attempt",ID,"Unique");strict.confirm(result,proof("attempt",ID,"Unique"));strict.invalidatePending();
+        assertEquals(List.of(key+".json"),cache.list());
+    }
+    @Test void strictFailureCannotDeleteAnUnconfirmedRecording() {
+        var engine=new Engine();var strict=agent(engine,script(),config("read-write",true),"attempt");
+        var result=act(strict,"attempt",ID,"Unique");var cache=new CacheStore(root.resolve("cache"));cache.put(result.key,result.actions);
+        strict.invalidatePending();assertEquals(List.of(result.key+".json"),cache.list());
+    }
+    @Test void incompleteObservationCannotAuthorizeAnAgentMutation() {
+        var field=new Observation.Node("field",SemanticTarget.label("Opportunity Name","edit-dialog"),"","",false,false);
+        var partial=new Observation(1,Instant.now(),"https://org/lightning/r/Opportunity/"+ID+"/edit",List.of(field),true,"PARTIAL","SAFE",null);
+        assertEquals("LOCATOR_INCOMPLETE",assertThrows(Failure.class,() -> scope("attempt",ID).validate(partial,field,"fill","Unique",Map.of("name",StepParam.unique("Unique")))).code());
+    }
+    @Test void ambiguousLiveFieldCannotBeMutatedBeforeEndVerification() {
+        var engine=new Engine();engine.ambiguous=true;var model=script();var live=agent(engine,model,config("off",false),"attempt");
+        assertEquals("TARGET_AMBIGUOUS",assertThrows(Failure.class,() -> act(live,"attempt",ID,"Unique")).code());
+        assertEquals(0,engine.mutations);assertEquals(1,model.calls());
+    }
+    @Test void uncertainLiveDispatchStopsBeforeAnotherModelDecisionOrMutation() {
+        var engine=new Engine();engine.failAfterMutation=true;var model=script();var live=agent(engine,model,config("off",false),"attempt");
+        assertEquals("ENGINE_FAILURE",assertThrows(Failure.class,() -> act(live,"attempt",ID,"Unique")).code());
+        assertEquals(1,engine.mutations);assertEquals(1,model.calls());
+    }
+    @Test void uncertainReplayDispatchRetainsItsFailureCodeAndNeverHandsOff() {
+        var first=new Engine();var learner=agent(first,script(),config("read-write",false),"first");
+        var learned=act(learner,"first",ID,"Unique-first");learner.confirm(learned,proof("first",ID,"Unique-first"));
+        var engine=new Engine();engine.failAfterMutation=true;var model=script();var replay=agent(engine,model,config("read-only",false),"second");
+        assertEquals("ENGINE_FAILURE",assertThrows(Failure.class,() -> act(replay,"second",ID,"Unique-second")).code());
+        assertEquals(1,engine.mutations);assertEquals(0,model.calls());
+    }
+    @Test void waitJudgesAgainWhenDisabledStateChangesWithoutTextChanging() {
+        var engine=new Engine();engine.disabled=true;engine.enableOnPoll=true;
+        var model=new ScriptedModelClient(request -> {assertTrue(request.ledger().isEmpty());return finish(request,engine.disabled?"FAILED":"PASSED",engine.disabled?"UI_ASSERTION_FAILED":null);});
+        assertDoesNotThrow(() -> agent(engine,model,config("off",false),"attempt").waitFor("The field is enabled",Duration.ofSeconds(1)));
+        assertEquals(2,model.calls());assertEquals(0,engine.mutations);
+    }
+    @Test void waitCannotPassAfterExceedingItsTokenBudget() {
+        var engine=new Engine();var c=config("off",false);var a=c.agent();
+        var policy=new FrameworkConfig.Agent(a.endpoint(),a.model(),a.apiKeyRef(),a.maxActions(),a.maxModelCalls(),10,a.actTimeoutSeconds());
+        var limited=new FrameworkConfig(1,c.projectId(),c.profile(),c.org(),c.ui(),c.auth(),c.personas(),c.execution(),policy,c.cache(),c.retention(),c.evidence(),c.report());
+        var model=new ScriptedModelClient(request -> new ModelClient.Response("finish",null,null,null,"PASSED","Current UI",null,List.of(request.observation().nodes().getFirst().id()),null,11L));
+        assertEquals("STEP_BUDGET_EXHAUSTED",assertThrows(Failure.class,() -> agent(engine,model,limited,"attempt").waitFor("The field is visible",Duration.ofSeconds(1))).code());
+        assertEquals(1,model.calls());
     }
     @Test void cacheWritesOnlyAfterCurrentPersistedProofAndRebindsUniqueValues() throws Exception {
         Engine first=new Engine();var scripted=script();var firstAgent=agent(first,scripted,config("read-write",false),"attempt-one");

@@ -20,6 +20,7 @@ Use this index to read the smallest set of documents needed for a task. The proj
 | Upgrade dependencies | [Dependency snapshot](DEPENDENCIES.md), [Development guide](DEVELOPMENT.md#compatibility-and-dependency-changes), [Verification](VERIFICATION.md) | Pin locations, migration risks and acceptance evidence |
 | Investigate performance | [Efficiency assessment](EFFICIENCY.md), [AI workflow](AI_WORKFLOW.md), [Reliability review](RELIABILITY_REVIEW.md) | Reproducible measurements and the limits of their claims |
 | Evaluate an existing verification claim | [Verification](VERIFICATION.md), the referenced dated review, the relevant source/test | Actual scope, provenance and reproducibility |
+| Compare upstream practices or use packaged guidance | [Reference practice audit](REFERENCE_PRACTICES.md), `guide --list`, the affected contract | Pinned comparison, reproduced faults, intentional gaps and offline agent entry points |
 
 ## Current contracts and procedures
 
@@ -47,6 +48,7 @@ These documents contain dated findings or receipts. A recorded passing inventory
 | Document | Use it for |
 | --- | --- |
 | [VERIFICATION.md](VERIFICATION.md) | Latest recorded full check inventory, commands, runtime compatibility and historical validation boundaries |
+| [REFERENCE_PRACTICES.md](REFERENCE_PRACTICES.md) | Pinned TesterArmy practice matrix, audit corrections, intentional product differences and re-audit procedure |
 | [RELIABILITY_REVIEW.md](RELIABILITY_REVIEW.md) | Readiness state, asynchronous selection, attempt budgets and failed/repeated runtime cleanup |
 | [TEST_STRUCTURE_REVIEW.md](TEST_STRUCTURE_REVIEW.md) | JUnit lifecycle findings, corrections and supported execution ordering |
 | [QUALITY_RESEARCH.md](QUALITY_RESEARCH.md) | Primary sources and adopted defect-detection practices |

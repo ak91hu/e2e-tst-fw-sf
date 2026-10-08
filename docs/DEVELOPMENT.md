@@ -20,6 +20,8 @@ This guide is for changing the reusable framework. It gives agents and maintaine
 
 ## First task workflow
 
+With only a packaged CLI, start with `java -jar <absolute-cli-path> guide --list` and `guide development`; all listed Markdown topics are embedded at build time and require no config or login. `guide best-practices` gives the pinned [reference audit](REFERENCE_PRACTICES.md). A source change still requires a matching checkout/build and the owning module's regression checks.
+
 1. Inspect the current branch/worktree with `git status --short`. Existing modifications may be work from a previous task; read and preserve them.
 2. Restate the requested behavior and identify its owner using the source map below. Read the relevant guide, public contract and existing tests.
 3. Follow the actual call path from CLI/JUnit entry to core logic and engine/reporting boundaries. Determine where a failure is classified and where resources/verdicts are finalized.

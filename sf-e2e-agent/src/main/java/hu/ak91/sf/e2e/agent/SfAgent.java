@@ -61,6 +61,7 @@ public final class SfAgent {
         List<CacheStore.Action> actions=new ArrayList<>();
         List<Map<String,Object>> ledger=new ArrayList<>();
         Observation baseline=engine.observe(scope.container(),deadline);
+        Failure.require(baseline.complete(),"LOCATOR_INCOMPLETE","Agent actions require a complete starting observation");
         String status=config.cache().mode().equals("off")?"OFF":"MISS";
         if(!config.cache().mode().equals("off")) {
             Optional<CacheStore.Trace> trace;
@@ -82,8 +83,10 @@ public final class SfAgent {
                     validateEnd(actions,params,baseline,scope,deadline);
                     return result(stepId,key,scope,actions,params,"REPLAYED",budget);
                 } catch(Failure e) {
-                    if(config.cache().strict() || !Set.of("TARGET_NOT_FOUND","TARGET_AMBIGUOUS","NODE_STALE","END_MISMATCH").contains(e.code()))
-                        throw new Failure("REPLAY_STALE","Replay stopped: "+e.code());
+                    event.accept(Map.of("kind","cache-replay-stopped","stepId",stepId,"entry",key,"code",e.code(),"completedActions",actions.size()));
+                    if(!Set.of("TARGET_NOT_FOUND","TARGET_AMBIGUOUS","NODE_STALE","END_MISMATCH").contains(e.code())) throw e;
+                    if(config.cache().strict()) throw new Failure("REPLAY_STALE","Strict replay stopped: "+e.code()+"; entry "+key+" is preserved. Relearn without strict mode to repair it.");
+                    if(cacheWritable()) store.invalidate(key);
                     status="HANDOFF"; ledger.add(Map.of("handoffReason",e.code()));
                 }
             } else Failure.require(!config.cache().requireRecorded(),"REPLAY_STALE","Required recording missing");
@@ -92,10 +95,12 @@ public final class SfAgent {
         while(true) {
             deadline.check(); budget.call();
             Observation observation=engine.observe(scope.container(),deadline);
+            Failure.require(observation.complete(),"LOCATOR_INCOMPLETE","Agent actions require complete current UI evidence");
             ModelClient.Response response;
             try {
                 event.accept(Map.of("kind","model-call","stepId",stepId,"call",budget.calls(),"usage","pending"));
                 response=executor.next(new ModelClient.Request("act",instruction,values(params),observation,List.copyOf(ledger),null),deadline);
+                Failure.require(response!=null,"MODEL_OUTPUT_INVALID","Empty action response");
                 budget.usage(response.tokens()); validateResponse(response,observation);
                 event.accept(Map.of("kind","model-usage","stepId",stepId,"call",budget.calls(),"tokens",response.tokens()==null?"unknown":response.tokens()));
             } catch(Failure e) {
@@ -121,7 +126,9 @@ public final class SfAgent {
                 actions.add(new CacheStore.Action(response.tool(),node.target(),response.paramRef(),response.paramRef()==null?value:null));
                 ledger.add(Map.of("kind",response.tool(),"target",node.target(),"value",value==null?"":value)); consecutiveFailures=0;
             } catch(Failure e) {
-                if(Set.of("POLICY_DENIED","RECORD_SCOPE_VIOLATION","STEP_TIMEOUT").contains(e.code())) throw e;
+                event.accept(Map.of("kind","agent-action-failed","stepId",stepId,"action",response.tool(),"code",e.code(),"preDispatchStale",e.code().equals("NODE_STALE")));
+                // Only an engine-guaranteed pre-dispatch stale rejection permits another decision.
+                if(!e.code().equals("NODE_STALE")) throw e;
                 consecutiveFailures++; ledger.add(Map.of("actionFailure",e.code()));
             }
         }
@@ -174,26 +181,29 @@ public final class SfAgent {
             Failure.require(expected!=null && String.valueOf(expected).equals(value),"PROOF_MISSING","Proof must cover each final mutated field exactly");
         }
         result.confirmed=true;
-        if(config.cache().mode().equals("read-write") && !result.cacheStatus.equals("NOT_RECORDED")) store.put(result.key,result.actions);
+        boolean written=cacheWritable() && !result.cacheStatus.equals("NOT_RECORDED");
+        if(written) store.put(result.key,result.actions);
+        event.accept(Map.of("kind","cache-write","stepId",result.stepId,"entry",result.key,"write",written?"saved":config.cache().strict()?"strict-preserved":"not-written"));
         event.accept(Map.of("stepId",result.stepId,"proofId",proof.id(),"proof","CONFIRMED"));
     }
     public void requireProofs() {
         for(var result:results) Failure.require(result.confirmed,"PROOF_MISSING","Agent act lacks persisted UI proof: "+result.stepId);
     }
     public void invalidatePending() {
-        if(config.cache().mode().equals("read-write")) for(var result:results) if(!result.confirmed) store.invalidate(result.key);
+        if(cacheWritable()) for(var result:results) if(!result.confirmed) store.invalidate(result.key);
     }
+    private boolean cacheWritable() { return config.cache().mode().equals("read-write") && !config.cache().strict(); }
     public void assertThat(String instruction) { judge("assert",instruction,null); }
     public JsonNode extract(String instruction,JsonNode schema) { return judge("extract",instruction,schema).data(); }
     private ModelClient.Response judge(String kind,String instruction,JsonNode schema) {
-        Deadline deadline=attempt.child(Duration.ofSeconds(90)); Budget budget=new Budget(1,2,config.agent().maxTokens());
+        Deadline deadline=attempt.child(Duration.ofSeconds(Math.min(90,config.agent().actTimeoutSeconds()))); Budget budget=new Budget(1,Math.min(2,config.agent().maxModelCalls()),config.agent().maxTokens());
         ModelClient.Response response=null;
         for(int repair=0;repair<2;repair++) {
             Observation observation=engine.observe("page",deadline);
             Failure.require(observation.complete(),kind.equals("extract")?"EXTRACTION_INCONCLUSIVE":"ASSERTION_INCONCLUSIVE","Observation is incomplete");
             budget.call();event.accept(Map.of("kind","model-call","stepKind",kind,"call",budget.calls(),"usage","pending"));
             response=executor.next(new ModelClient.Request(kind,instruction,Map.of(),observation,List.of(),schema),deadline);
-            budget.usage(response.tokens());deadline.check();
+            Failure.require(response!=null,"MODEL_OUTPUT_INVALID","Empty judge response");budget.usage(response.tokens());deadline.check();
             try { validateResponse(response,observation);
                 Failure.require(response.tool().equals("finish"),"MODEL_OUTPUT_INVALID","Read-only judge cannot request UI actions");
                 if(kind.equals("extract") && "PASSED".equals(response.verdict())) validateData(response.data(),schema);
@@ -209,15 +219,17 @@ public final class SfAgent {
         JsonSchema.validate(data,schema);
     }
     public void waitFor(String instruction,Duration timeout) {
-        Deadline deadline=attempt.child(timeout); String previous=null; int calls=0;
+        Deadline deadline=attempt.child(timeout).child(Duration.ofSeconds(config.agent().actTimeoutSeconds()));String previous=null;
+        var budget=new Budget(1,Math.min(10,config.agent().maxModelCalls()),config.agent().maxTokens());
         while(true) {
             deadline.check(); Observation observation=engine.observe("page",deadline);
             Failure.require(observation.complete(),"ASSERTION_INCONCLUSIVE","Wait observation incomplete");
-            String digest=Json.hash(observation.nodes().stream().map(n -> List.of(n.target(),n.text(),n.value(),n.checked())).toList());
+            String digest=hu.ak91.sf.e2e.core.scenario.UiReadiness.stateDigest(observation);
             if(!digest.equals(previous)) {
-                Failure.require(calls++<10,"STEP_BUDGET_EXHAUSTED","Wait judge call limit reached");
-                event.accept(Map.of("kind","model-call","stepKind","wait","call",calls,"usage","pending"));
+                budget.call();event.accept(Map.of("kind","model-call","stepKind","wait","call",budget.calls(),"usage","pending"));
                 var response=executor.next(new ModelClient.Request("wait",instruction,Map.of(),observation,List.of(),null),deadline);
+                Failure.require(response!=null,"MODEL_OUTPUT_INVALID","Empty wait judge response");budget.usage(response.tokens());deadline.check();
+                event.accept(Map.of("kind","model-usage","stepKind","wait","call",budget.calls(),"tokens",response.tokens()==null?"unknown":response.tokens()));
                 validateResponse(response,observation); Failure.require(response.tool().equals("finish"),"MODEL_OUTPUT_INVALID","Wait is read-only");
                 if("PASSED".equals(response.verdict())) return;
                 if("BLOCKED".equals(response.verdict())) throw new Failure(response.errorCode(),response.reason());

@@ -11,6 +11,8 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.util.*;
+import javax.imageio.ImageIO;
+import java.awt.Color;
 
 public final class PlaywrightEngine implements UiEngine {
     private final Thread owner = Thread.currentThread();
@@ -222,8 +224,8 @@ public final class PlaywrightEngine implements UiEngine {
                     String id=prefix+node.id(); frames.put(id,frame); localIds.put(id,node.id());
                     Map<String,String> attributes=new HashMap<>();
                     node.attributes().forEach((key,value) -> { String safe=secrets.redact(value); if(!safe.contains("[REDACTED]")) attributes.put(key,safe); });
-                    attributes.put("frame",frame==page.mainFrame()?"main":hu.ak91.sf.e2e.core.locator.LocatorEntry.routeKey(frame.url()));
-                    var t=node.target(); nodes.add(new Observation.Node(id,new SemanticTarget(t.role(),secrets.redact(t.name()),secrets.redact(t.label()),t.container()),
+                    attributes.put("frame",frame==page.mainFrame()?"main":secrets.redact(hu.ak91.sf.e2e.core.locator.LocatorEntry.routeKey(frame.url())));
+                    var t=node.target(); nodes.add(new Observation.Node(id,new SemanticTarget(t.role(),secrets.redact(t.name()),secrets.redact(t.label()),secrets.redact(t.container())),
                         secrets.redact(node.text()),secrets.redact(node.value()),node.disabled(),node.checked(),attributes));
                 }
             } catch(RuntimeException e) { throw new Failure("AUTOMATION_UNSUPPORTED","Cannot observe requested UI scope safely"); }
@@ -472,21 +474,50 @@ public final class PlaywrightEngine implements UiEngine {
             return Map.copyOf(fields);
         } catch(Failure e) { throw e; } catch(RuntimeException e) { throw new Failure("AUTOMATION_UNSUPPORTED","Visible Details reader failed"); }
     }
+    private record MaskRect(double x,double y,double width,double height) {}
+    private List<MaskRect> maskRectangles(Deadline deadline) {
+        List<MaskRect> rectangles=new ArrayList<>();
+        for(Frame frame:page.frames()) {
+            Failure.require(frame==page.mainFrame() || config.origins().contains(origin(frame.url())),"EVIDENCE_WITHHELD","Mask coverage cannot be proven for iframe");
+            frame.evaluate(SCRIPT);
+            var ids=(List<?>)frame.evaluate("args => window.__sfE2e.masks(args)",Map.of("secrets",secrets.maskingValues(),"pii",config.evidence().piiLabels()));
+            for(Object id:ids) {
+                var box=frame.locator("sfnode="+id).boundingBox(new Locator.BoundingBoxOptions().setTimeout(timeout(deadline)));
+                Failure.require(box!=null && Double.isFinite(box.x) && Double.isFinite(box.y) && Double.isFinite(box.width) && Double.isFinite(box.height),
+                    "EVIDENCE_WITHHELD","A sensitive painted control lost its mask geometry");
+                rectangles.add(new MaskRect(box.x,box.y,box.width,box.height));
+            }
+        }
+        rectangles.sort(Comparator.comparingDouble(MaskRect::x).thenComparingDouble(MaskRect::y).thenComparingDouble(MaskRect::width).thenComparingDouble(MaskRect::height));
+        return List.copyOf(rectangles);
+    }
     @Override public byte[] captureMaskedPng(Deadline deadline) {
-        check(deadline); safePage(); List<Locator> masks=new ArrayList<>();
+        check(deadline); safePage();
         Failure.require(shadowCoverage(),"EVIDENCE_WITHHELD","Masking cannot cover an untracked closed shadow root");
         try {
-            for(Frame frame:page.frames()) {
-                Failure.require(frame==page.mainFrame() || config.origins().contains(origin(frame.url())),"EVIDENCE_WITHHELD","Mask coverage cannot be proven for iframe");
-                frame.evaluate(SCRIPT);
-                var ids=(List<?>)frame.evaluate("args => window.__sfE2e.masks(args)",Map.of("secrets",secrets.maskingValues(),"pii",config.evidence().piiLabels()));
-                for(Object id:ids) masks.add(frame.locator("sfnode="+id));
-            }
+            var rectangles=maskRectangles(deadline);
             revision++; frames.clear(); localIds.clear();
-            return page.screenshot(new Page.ScreenshotOptions().setType(ScreenshotType.PNG).setMask(masks).setTimeout(timeout(deadline)));
+            // Mask the returned pixels instead of depending on a DOM overlay surviving application/document replacement.
+            byte[] raw=page.screenshot(new Page.ScreenshotOptions().setType(ScreenshotType.PNG).setScale(ScreenshotScale.CSS).setTimeout(timeout(deadline)));
+            Failure.require(rectangles.equals(maskRectangles(deadline)) && shadowCoverage(),"EVIDENCE_WITHHELD","Sensitive mask coverage changed during capture");
+            check(deadline);safePage();
+            var image=ImageIO.read(new ByteArrayInputStream(raw));
+            Failure.require(image!=null,"EVIDENCE_WITHHELD","Screenshot pixels could not be decoded for masking");
+            var graphics=image.createGraphics();
+            try {
+                graphics.setColor(Color.MAGENTA);
+                for(var box:rectangles) {
+                    int left=(int)Math.max(0,Math.floor(box.x())),top=(int)Math.max(0,Math.floor(box.y()));
+                    int right=(int)Math.min(image.getWidth(),Math.ceil(box.x()+box.width())),bottom=(int)Math.min(image.getHeight(),Math.ceil(box.y()+box.height()));
+                    if(right>left && bottom>top) graphics.fillRect(left,top,right-left,bottom-top);
+                }
+            } finally { graphics.dispose(); }
+            var output=new ByteArrayOutputStream();
+            Failure.require(ImageIO.write(image,"png",output),"EVIDENCE_WITHHELD","Masked screenshot pixels could not be encoded");
+            check(deadline);return output.toByteArray();
         } catch(Failure e) { throw e; } catch(RuntimeException e) {
             throw new Failure("EVIDENCE_WITHHELD","Screenshot masking or capture failed ("+e.getClass().getSimpleName()+"): "+secrets.redact(Objects.toString(e.getMessage(),"No diagnostic")));
-        }
+        } catch(IOException e) { throw new Failure("EVIDENCE_WITHHELD","Screenshot pixel masking failed"); }
     }
     @Override public void poll(Deadline deadline) {
         check(deadline);
