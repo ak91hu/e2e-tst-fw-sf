@@ -54,6 +54,13 @@ class CaseCommandsTest {
         assertEquals(2,run("learn-case","--config","../sf-e2e.yaml","--locator-mode","read-write","--output",root.resolve("new.json").toString()));
         assertTrue(errors.toString().contains("Supply exactly one"));assertFalse(errors.toString().contains("credential"));
     }
+    @Test void reproCharterRejectsChangedIntentBeforeCredentialsOrUi() {
+        var oracle=new CaseSpec.Step("expectText","Result",null,null,"expected",null);Path charter=root.resolve("charter.json"),spec=root.resolve("spec.json"),values=root.resolve("values.json");
+        Json.write(charter,new ExplorationCharter(1,"repro","Verify supplied result",List.of("/app"),Set.of("click"),Set.of("Submit"),List.of(oracle),1,5));
+        Json.write(spec,new CaseSpec("repro","/app",List.of(new CaseSpec.Step("click","Delete everything",null,null,null,null),oracle)));Json.write(values,Map.of("expected","INDEPENDENT_EXPECTATION"));
+        assertEquals(2,run("learn-case","--config","../sf-e2e.yaml","--locator-mode","read-write","--spec",spec.toString(),"--params",values.toString(),"--charter",charter.toString(),"--output",root.resolve("new.json").toString()));
+        assertTrue(errors.toString().contains("MODEL_OUTPUT_INVALID"));assertFalse(errors.toString().contains("credential"));assertFalse(Files.exists(root.resolve("TST_new.json")));
+    }
     @Test void malformedSpecAndMissingExpectedParametersFailBeforeCredentials() {
         var file=root.resolve("spec.json");Json.write(file,new CaseSpec("case","/app",List.of(new CaseSpec.Step("expectText","Result",null,null,"expected",null))));
         assertEquals(2,run("learn-case","--config","../sf-e2e.yaml","--locator-mode","read-write","--spec",file.toString(),"--output",root.resolve("new.json").toString()));

@@ -102,6 +102,29 @@ class CaseWorkflowHarnessIT {
             }
         }
     }
+    @Test void charterExplorationPlansAndLearnsBusinessFlowThenReplaysWithoutProvider() throws Exception {
+        try(var fixture=new Fixture()) {
+            var config=fixture.config();var secrets=new SecretRegistry();var deadline=Deadline.after(Duration.ofSeconds(90));var disk=new LocatorStore(root,"isolated","read-write");CaseRecipe recipe;
+            var charter=new ExplorationCharter(1,"workflow","Verify the supplied expected result",List.of("/start"),Set.of("click","fill"),Set.of("Continue","Input","Submit"),List.of(Fixture.spec().steps().getLast()),2,10);
+            try(var engine=new PlaywrightEngine(config,secrets,deadline)) {
+                var plans=new CaseExplorer(engine,fixture.model(secrets),config.agent(),secrets).plan(charter,Set.of("input","expected"),deadline);assertEquals(0,fixture.submitted.get());
+                assertEquals(List.of(Fixture.spec()),plans);recipe=new CaseLearner(engine,disk,fixture.model(secrets),config,secrets,e -> {}).learn(plans.getFirst(),"isolated",Map.of("input","PRIVATE_EXPLORED_VALUE","expected","PRIVATE_EXPLORED_VALUE"),deadline,charter);
+            }
+            assertEquals(1,fixture.submitted.get());assertFalse(fixture.requests.toString().contains("PRIVATE_EXPLORED_VALUE"));fixture.provider.stop(0);
+            try(var engine=new PlaywrightEngine(config,secrets,deadline)) {new CaseRunner(engine,disk,config,deadline,e -> {}).run(recipe,"isolated",disk,Map.of("input","REPLAY_VALUE","expected","REPLAY_VALUE"));}
+            assertEquals(2,fixture.submitted.get());assertEquals(5,fixture.calls.get());
+        }
+    }
+    @Test void modelCannotSubstituteAnotherMutationForCharterAuthorizedInstruction() throws Exception {
+        try(var fixture=new Fixture()) {
+            var config=fixture.config();var secrets=new SecretRegistry();var deadline=Deadline.after(Duration.ofSeconds(30));var disk=new LocatorStore(root,"isolated","read-write");
+            var oracle=new CaseSpec.Step("expectVisible","Start",null,null,null,null);var spec=new CaseSpec("bounded-target","/start",List.of(new CaseSpec.Step("click","Continue",null,null,null,null),oracle));
+            var charter=new ExplorationCharter(1,"bounded-target","Verify supplied presence",List.of("/start"),Set.of("click"),Set.of("Continue"),List.of(oracle),1,5);
+            var model=new ScriptedModelClient(r -> {String id=r.observation().nodes().stream().filter(n -> "Do work".equals(n.target().name())).findFirst().orElseThrow().id();return new ModelClient.Response("finish",null,null,null,"PASSED","Wrong target",null,List.of(),Json.MAPPER.valueToTree(Map.of("nodeId",id)),10L);});
+            try(var engine=new PlaywrightEngine(config,secrets,deadline)) {assertEquals("CHARTER_TARGET_DENIED",assertThrows(Failure.class,() -> new CaseLearner(engine,disk,model,config,secrets,e -> {}).learn(spec,"isolated",Map.of(),deadline,charter)).code());}
+            assertEquals(0,fixture.submitted.get());assertEquals(1,model.calls());
+        }
+    }
     @Test void navigationProbeExcludesSecretsRecordsButtonsAndForeignDestinations() throws Exception {
         try(var fixture=new Fixture()) {
             var config=fixture.config();var deadline=Deadline.after(Duration.ofSeconds(30));
@@ -113,7 +136,7 @@ class CaseWorkflowHarnessIT {
     }
     private static final class Fixture implements AutoCloseable {
         final HttpServer app,provider;final AtomicInteger calls=new AtomicInteger(),submitted=new AtomicInteger();
-        final AtomicReference<String> label=new AtomicReference<>("Original field");final List<String> requests=new ArrayList<>();
+        final AtomicReference<String> label=new AtomicReference<>("Input");final List<String> requests=new ArrayList<>();
         final AtomicBoolean selectRoutes=new AtomicBoolean(true);
         Fixture() throws Exception {
             app=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);provider=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
@@ -130,6 +153,7 @@ class CaseWorkflowHarnessIT {
                     var raw=Json.MAPPER.readTree(e.getRequestBody().readAllBytes());String content=raw.path("messages").get(1).path("content").asString();requests.add(content);
                     var request=Json.MAPPER.readTree(content);String kind=request.path("kind").asString();Object data;
                     switch(kind) {
+                        case "explore-cases" -> data=Map.of("cases",List.of(spec()));
                         case "case-plan" -> data=Map.of("steps",spec().steps());
                         case "case-target" -> {
                             String target=request.path("params").path("target").asString();String role=switch(target) {case "Continue" -> "link";case "Input" -> "textbox";case "Submit" -> "button";default -> "status";};

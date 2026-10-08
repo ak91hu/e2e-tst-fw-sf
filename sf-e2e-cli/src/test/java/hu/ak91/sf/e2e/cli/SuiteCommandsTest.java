@@ -71,6 +71,23 @@ class SuiteCommandsTest {
         prepare();var cmd=command(false);List<String> executed=new ArrayList<>();cmd.executor=(c,p,path) -> {executed.add(p.row().id());throw new Failure("CANCELLED","Stopped");};
         assertEquals(130,cmd.call());assertEquals(List.of("first"),executed);SuiteReportExporter.verify(runRoot());
     }
+    @Test void lastFailedUsesVerifiedCurrentReceiptAndShardsRetainProvenance() throws Exception {
+        prepare();var first=command(false);first.executor=(c,p,path) -> {state(path,p,p.row().id().equals("first")?"FAILED":"PASSED",p.row().id().equals("first")?"ASSERTION_FAILED":null);return p.row().id().equals("first")?1:0;};
+        assertEquals(1,first.call());Path previous=runRoot();var config=FrameworkConfig.load(configFile,Map.of("profile","deterministic"));
+        var rerun=command(false);rerun.input.lastFailed=previous;assertEquals(List.of("first"),rerun.input.prepare(config).stream().map(p -> p.row().id()).toList());
+        Json.write(manifest,new CaseSuite(1,"regression",List.of(new CaseSuite.Row("first","recipe.json",null,null,List.of("changed")))));
+        assertEquals("SELECTION_STALE",assertThrows(Failure.class,() -> rerun.input.prepare(config)).code());
+        Json.write(manifest,new CaseSuite(1,"regression",List.of(new CaseSuite.Row("first","recipe.json",null,null,List.of("smoke")),new CaseSuite.Row("second","recipe.json",null,null,List.of("regression")))));
+        var shard=command(false);shard.input.shard="2/2";List<String> ran=new ArrayList<>();shard.executor=(c,p,path) -> {ran.add(p.row().id());state(path,p,"PASSED",null);return 0;};assertEquals(0,shard.call());assertEquals(List.of("second"),ran);
+        try(var roots=Files.list(root.resolve("report"))) {var report=roots.filter(p -> !p.equals(previous)).findFirst().orElseThrow();SuiteReportExporter.verify(report);var saved=Json.read(report.resolve("suite-report.json"),Map.class);assertEquals("2/2",saved.get("shard"));assertEquals(SuiteSelection.sourceHash(CaseSuite.load(manifest)),saved.get("suiteSourceHash"));}
+    }
+    @Test void generatedSkillHasExecutableFingerprintPreflightAndNoParameterValues() throws Exception {
+        prepare();var cli=SfE2eCli.commandLine();Path output=root.resolve("agent-skill");String[] args={"verification-skill","--config",configFile.toString(),"--suite",manifest.toString(),"--output-dir",output.toString()};
+        assertEquals(0,cli.execute(args));String skill=Files.readString(output.resolve("SKILL.md"));assertTrue(skill.contains("--check"));assertTrue(skill.contains("--strict-locators"));assertTrue(skill.contains("report verify --run"));
+        var check=new ArrayList<>(List.of(args));check.add("--check");assertEquals(0,cli.execute(check.toArray(String[]::new)));
+        Json.write(manifest,new CaseSuite(1,"regression",List.of(new CaseSuite.Row("first","recipe.json",null,null,List.of("changed")))));
+        assertEquals(2,cli.execute(check.toArray(String[]::new)));assertEquals(2,cli.execute(args));assertTrue(Files.exists(output.resolve("SKILL.md.manifest.json")));
+    }
     @Test void evidenceFailureAfterSuccessfulUiWorkCannotKeepAPassingDataset() throws Exception {
         prepare();var cmd=command(false);cmd.executor=(c,p,path) -> {state(path,p,"PASSED",null);if(p.row().id().equals("first"))throw new Failure("EVIDENCE_INCOMPLETE","Publication failed");return 0;};
         assertEquals(4,cmd.call());Path report=runRoot();SuiteReportExporter.verify(report);var saved=Json.read(report.resolve("cases/first/case-report.json"),Map.class);

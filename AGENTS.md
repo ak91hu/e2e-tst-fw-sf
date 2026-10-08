@@ -41,6 +41,8 @@ This repository is a reusable Salesforce UI automation framework. Keep framework
 
 Public documentation, framework messages and configuration comments use English. Localized app/test fixtures may use other languages.
 
+Read [autonomous workflows](docs/AUTONOMOUS_WORKFLOWS.md) before changing charters, MCP, verification skills, encrypted sessions or CI failure/shard selection. Keep caller-owned oracle/action boundaries, host-only capability grants, owner-thread session/identity locks and receipt fingerprints. Generated specs and successful subsets never imply complete application coverage. Preserve new canonical resource-set fingerprints without changing historical recipe/cache checksums.
+
 When behavior changes, update the owning guide and any affected README/configuration examples. Explain the trigger, resulting behavior, compatibility implications and exact verification scope. New guides must appear in [docs/README.md](docs/README.md); maintain local links and heading anchors.
 
 Public root/docs Markdown is bundled with the CLI. When adding a guide, expose an explicit safe topic in `GuideCommand` and keep `GuideCommandTest`'s all-topic read check passing. `guide --list` works without a checkout/config; the [reference audit](docs/REFERENCE_PRACTICES.md) records the pinned upstream comparison and explicit feature gaps.

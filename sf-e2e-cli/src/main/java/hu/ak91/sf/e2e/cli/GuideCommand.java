@@ -9,10 +9,10 @@ import java.util.concurrent.Callable;
 /** Public guides travel with the CLI so another agent can use the framework without a source checkout. */
 @Command(name="guide",mixinStandardHelpOptions=true,description="Read bundled Markdown guidance offline, without configuration, credentials or a source checkout.")
 public final class GuideCommand implements Callable<Integer> {
-    private static final Map<String,String> TOPICS=Map.ofEntries(
+    static final Map<String,String> TOPICS=Map.ofEntries(
         Map.entry("start","README.md"),Map.entry("agents","AGENTS.md"),Map.entry("index","docs/README.md"),
         Map.entry("cases","docs/CASE_WORKFLOWS.md"),Map.entry("ai","docs/AI_WORKFLOW.md"),Map.entry("development","docs/DEVELOPMENT.md"),
-        Map.entry("best-practices","docs/REFERENCE_PRACTICES.md"),Map.entry("verification","docs/VERIFICATION.md"),
+        Map.entry("best-practices","docs/REFERENCE_PRACTICES.md"),Map.entry("autonomous","docs/AUTONOMOUS_WORKFLOWS.md"),Map.entry("verification","docs/VERIFICATION.md"),
         Map.entry("capabilities","docs/ADVANCED_CAPABILITIES.md"),Map.entry("reporting","docs/ALLURE_REPORTING.md"),
         Map.entry("implementation","docs/IMPLEMENTATION.md"),Map.entry("pom","docs/PAGE_OBJECT_MODEL.md"),
         Map.entry("requirements","docs/REQUIREMENTS.md"),Map.entry("dependencies","docs/DEPENDENCIES.md"),

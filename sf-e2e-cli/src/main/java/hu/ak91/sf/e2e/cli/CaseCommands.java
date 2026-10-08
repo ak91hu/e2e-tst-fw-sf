@@ -80,6 +80,8 @@ public final class CaseCommands {
     }
     @Command(name="learn-case",mixinStandardHelpOptions=true,description="Learn a supplied JSON/text test case with AI; save a verified recipe for model-free replay.")
     public static final class Learn implements Callable<Integer> {
+        ExplorationCharter charter;
+        @Option(names="--charter",description="Optional consumer charter for a reviewed --spec; enforces exact authorized target names and unchanged oracles.") Path charterFile;
         @Mixin InputOptions input;
         @Option(names="--spec",description="JSON {id,startRoute,steps:[{kind,instruction,scope,valueRef,...}]}.") Path spec;
         @Option(names="--instructions",description="UTF-8 test case; requires --id/--route. Literal values are extracted into a separate private parameter file.") Path instructions;
@@ -88,12 +90,15 @@ public final class CaseCommands {
         @Option(names="--output",required=true,description="New recipe JSON file; its filename gets TST_ when absent. Existing recipes are preserved.") Path output;
         public Integer call() {
             var config=input.options.config("mapping");requireMapping(config);output=preparedOutput(output);
+            Failure.require(charterFile==null || spec!=null,"CASE_INVALID","Charter learning requires a reviewed specification");
+            if(charterFile!=null) charter=Json.MAPPER.treeToValue(readJson(charterFile),ExplorationCharter.class);
             Failure.require((spec!=null) != (instructions!=null),"CASE_INVALID","Supply exactly one of --spec or --instructions");
             var params=new TreeMap<>(input.parameters());CaseSpec supplied=null;String text=null;
             if(spec!=null) {
                 Failure.require(id==null && route==null,"CASE_INVALID","--id/--route are supplied by --spec");
                 supplied=readSpec(spec);
                 validateSpecParams(supplied,params);id=supplied.id();route=supplied.startRoute();
+                if(charter!=null) charter.validate(supplied,params.keySet());
             } else {
                 requireNewOutput(parameterOutput(output));
                 Failure.require(id!=null && route!=null,"CASE_INVALID","Text input requires --id and --route");id=CaseNames.generated(id);
@@ -109,7 +114,7 @@ public final class CaseCommands {
                     plan=translated.spec();params.putAll(translated.parameters());
                     if(!translated.parameters().isEmpty()) events.accept(Map.of("kind","case-parameters-extracted","parameterNames",params.keySet()));
                 }
-                return learner.learn(plan,namespace,params,deadline);
+                return learner.learn(plan,namespace,params,deadline,charter);
             });
         }
     }
@@ -142,10 +147,10 @@ public final class CaseCommands {
             });
         }
     }
-    @FunctionalInterface private interface Work {
+    @FunctionalInterface interface Work {
         CaseRecipe execute(PlaywrightEngine engine,LocatorStore store,ModelClient model,String namespace,Deadline deadline,SecretRegistry secrets,Consumer<Map<String,Object>> events);
     }
-    private static int session(FrameworkConfig config,Persona persona,String id,String startRoute,Map<String,String> params,String mode,Path output,Work work) {
+    static int session(FrameworkConfig config,Persona persona,String id,String startRoute,Map<String,String> params,String mode,Path output,Work work) {
         return session(config,persona,id,startRoute,params,mode,output,work,null,null);
     }
     static int replayDataset(FrameworkConfig config,Persona persona,CaseRecipe recipe,Map<String,String> params,Path root,String datasetId) {

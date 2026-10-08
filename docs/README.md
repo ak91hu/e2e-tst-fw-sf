@@ -11,6 +11,7 @@ Use this index to read the smallest set of documents needed for a task. The proj
 | First maintenance task | [Agent instructions](../AGENTS.md), [Development guide](DEVELOPMENT.md), [Implementation](IMPLEMENTATION.md) | Scope, invariants, source ownership and checks |
 | Find a CLI workflow | [README workflow selector](../README.md#choose-a-workflow), [Case workflows](CASE_WORKFLOWS.md) | Correct command and expected artifacts |
 | Review generated intent or discovery gaps | [Plan review](CASE_WORKFLOWS.md#review-a-plan-before-executing), [Discovery scope](CASE_WORKFLOWS.md#interpret-discovery-scope-and-continue) | Editable intent before actions, offline preflight and honest remaining-work summary |
+| Explore workflows, connect an agent or split CI work | [Autonomous workflows](AUTONOMOUS_WORKFLOWS.md), [Case workflows](CASE_WORKFLOWS.md) | Consumer charters/repro bundles, MCP host policy, encrypted sessions, verification skills and failure/shard selection |
 | Change controls, healing or page APIs | [Page Object Model](PAGE_OBJECT_MODEL.md), [Implementation](IMPLEMENTATION.md), [Reliability review](RELIABILITY_REVIEW.md) | Fresh-state, identity, retry and cleanup contracts |
 | Change AI learning or transport | [AI workflow](AI_WORKFLOW.md), [Case workflows](CASE_WORKFLOWS.md), [Development guide](DEVELOPMENT.md#change-recipes) | Request/budget boundaries and provider-free replay checks |
 | Change JUnit lifecycle or scheduling | [Test structure review](TEST_STRUCTURE_REVIEW.md), [Advanced capabilities](ADVANCED_CAPABILITIES.md), [Development guide](DEVELOPMENT.md#change-recipes) | Teardown, dependencies, owner threads and resource locks |
@@ -32,6 +33,7 @@ These documents describe implementation or operation. Consult current source if 
 | [IMPLEMENTATION.md](IMPLEMENTATION.md) | Authentication, mapping/storage, deterministic execution, healing and evidence contracts |
 | [PAGE_OBJECT_MODEL.md](PAGE_OBJECT_MODEL.md) | Default page APIs, session reuse, composition, naming and historical recipe compatibility |
 | [CASE_WORKFLOWS.md](CASE_WORKFLOWS.md) | Structured/text learning, discovery, replay, parameters and dataset suites |
+| [AUTONOMOUS_WORKFLOWS.md](AUTONOMOUS_WORKFLOWS.md) | Chartered workflow exploration/reproduction, local MCP, generated consumer skills, encrypted sessions and dependency-safe CI selection |
 | [AI_WORKFLOW.md](AI_WORKFLOW.md) | Shared budgets, wire/input/output limits, reuse, batching, escalation and accounting |
 | [ALLURE_REPORTING.md](ALLURE_REPORTING.md) | Evidence ownership, screenshots, artifacts, renderer, rebuild and verification |
 | [ADVANCED_CAPABILITIES.md](ADVANCED_CAPABILITIES.md) | REST/fixtures, scheduling, files/pages/widgets, quality, external layers and native sessions |

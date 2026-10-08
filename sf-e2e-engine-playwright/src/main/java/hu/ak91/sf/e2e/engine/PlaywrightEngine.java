@@ -20,6 +20,7 @@ public final class PlaywrightEngine implements UiEngine {
     private final Browser browser;
     private final BrowserContext context;
     private Page page;
+    private boolean secretFilled;
     private CDPSession domInspector;
     private final boolean borrowedRuntime;
     private static final ThreadLocal<WorkerRuntime> WORKER=new ThreadLocal<>();
@@ -383,7 +384,7 @@ public final class PlaywrightEngine implements UiEngine {
     }
     public Set<String> pageHandles() { check(attemptDeadline);return Set.copyOf(pageHandles.keySet()); }
     public void startPrivateTrace(java.nio.file.Path ownedRoot,String attemptId) {
-        check(attemptDeadline);safePage();Failure.require(qualityMonitoring && !tracing,"POLICY_DENIED","Trace starts only after trusted authentication and quality monitoring");
+        check(attemptDeadline);safePage();Failure.require(qualityMonitoring && !tracing && !secretFilled,"POLICY_DENIED","Trace starts only after trusted authentication and quality monitoring, before opaque secret fill");
         traceRoot=PrivateArtifacts.create(ownedRoot,attemptId,config.evidence().privateRetentionHours());traceAttempt=attemptId;
         context.tracing().start(new Tracing.StartOptions().setScreenshots(false).setSnapshots(true).setSources(false));tracing=true;
     }
@@ -475,6 +476,17 @@ public final class PlaywrightEngine implements UiEngine {
         } catch(Failure e) { throw e; } catch(RuntimeException e) { throw new Failure("AUTOMATION_UNSUPPORTED","Visible Details reader failed"); }
     }
     private record MaskRect(double x,double y,double width,double height) {}
+    /** Host-resolved opaque fill. No value is returned, logged or made available as a model parameter. */
+    public void fillSecret(SemanticTarget target,SecretRef ref,Deadline deadline) {
+        check(deadline);safePage();Failure.require(!tracing,"POLICY_DENIED","Opaque secret fill requires raw tracing to be stopped");String value=secrets.resolve(ref);
+        secretFilled=true;action("fill",target,value,deadline);
+    }
+    /** Exports the current authorized session only as an authenticated, expiring encrypted envelope. */
+    public void exportEncryptedSession(java.nio.file.Path output,String keyRef,Duration ttl,Deadline deadline) {
+        check(deadline);safePage();Failure.require(!java.nio.file.Files.exists(output),"POLICY_DENIED","Encrypted session output already exists");
+        String state=context.storageState(new BrowserContext.StorageStateOptions().setIndexedDB(true));
+        Json.write(output,Json.MAPPER.readTree(SessionVault.seal(state,keyRef,SessionVault.key(keyRef,secrets),config.origins(),ttl,java.time.Clock.systemUTC())));
+    }
     private List<MaskRect> maskRectangles(Deadline deadline) {
         List<MaskRect> rectangles=new ArrayList<>();
         for(Frame frame:page.frames()) {
@@ -493,6 +505,7 @@ public final class PlaywrightEngine implements UiEngine {
     }
     @Override public byte[] captureMaskedPng(Deadline deadline) {
         check(deadline); safePage();
+        Failure.require(!secretFilled,"EVIDENCE_WITHHELD","Screenshots are prohibited for the lifetime of a context after an opaque secret fill");
         Failure.require(shadowCoverage(),"EVIDENCE_WITHHELD","Masking cannot cover an untracked closed shadow root");
         try {
             var rectangles=maskRectangles(deadline);

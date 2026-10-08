@@ -68,20 +68,20 @@ Recipe, locator and agent cache document schemas/checksums are unchanged. Existi
 
 ## Intentional differences and product gaps
 
-These are explicit boundaries, not implemented features hidden behind a best-practice claim:
+The implementation follow-up closes the applicable workflow/integration gaps below. Intentional Java/security/hosted-product differences remain explicit; similar functionality is not a claim of reference API parity. [Autonomous workflows](AUTONOMOUS_WORKFLOWS.md) owns exact commands, bounds, private artifacts and source/check traceability.
 
 | Reference capability / convention | Framework position |
 | --- | --- |
-| Fully autonomous mutating exploration, multi-agent bug bashes and automatic repro generation | Discovery is bounded read-only navigation; business workflows use reviewed supplied intent. Consumer charters/data/oracles remain outside the framework. There is no built-in fan-out agent orchestrator. |
-| Built-in MCP server, browser session catalog and generated app-specific verification skill | Not supplied. Agents use checked-in `AGENTS.md`, bundled `guide`, CLI inspection/planning and versioned reports. |
+| Autonomous mutating exploration and automatic repro generation | Implemented as `explore-cases`: UI-informed plans obey consumer routes/action instructions/oracles; explicit `--execute` learns in fresh contexts, stops on failure and retains private specs/parameters/findings for explicit reproduction. This does not invent business expectations or claim full application coverage. Host-managed multi-agent fan-out remains external. |
+| Built-in MCP server, browser session catalog and generated app-specific verification skill | Implemented as host-gated local stdio `mcp`, isolated owner-thread session tools and fingerprint-checked `verification-skill`. Guides are tools/resources. The synchronous MCP subset and unsupported cancellation/HTTP/task features are documented explicitly. |
 | AI pixel/coordinate actions and vision judgments | Not supplied. Semantic identity and exact deterministic/explicit live judgments are the supported paths. Unknown/ambiguous surfaces fail. |
-| Opaque UI secret-fill handles and screenshot prohibition after such a fill | Business agent params reject `SecretRef`; login occurs through JWT or external browser state. Arbitrary AI secret fills are not enabled. Known session-secret echoes are masked, but arbitrary transforms and values split across nodes need consumer review. |
-| Runner-generated encrypted reusable sessions | The framework consumes external authorized state and creates fresh isolated contexts; it does not export reusable session files. External state must be protected by the consuming project. |
+| Opaque UI secret-fill handles and screenshot prohibition after such a fill | Implemented through the engine and explicitly host-allowlisted MCP refs; no value is returned to the agent, all PNG capture/raw tracing is prohibited after opaque fill, and active tracing must stop before fill. Ordinary business-case params still reject `SecretRef`. |
+| Runner-generated encrypted reusable sessions | Implemented as AES-256-GCM expiring origin-bound envelopes, host-only keys, CLI encryption and MCP live-session export. External storage-state authentication consumes plaintext legacy state or authenticates/decrypts envelopes in memory. |
 | Broad navigation across origins and unnamed positional fallback | Deliberately narrower exact-origin/frame, semantic uniqueness and identity rules are retained for Salesforce data isolation. |
 | Live handoff after an unexpected business assertion during saved-case replay | Deterministic recipes fail against the caller's unchanged expectation. Healing can repair identity; it cannot reinterpret business outcomes or construct a provider. |
 | Invalid agent cache files silently become misses | This framework retains explicit integrity failures instead of authorizing a new mutation from corrupt storage. Review/clear the agent cache deliberately; permanent journals are separate. |
 | CI retries and flaky-pass classification | Automatic business retries stay disabled. An explicit later rerun retains separate evidence and must use repeatable consumer data. |
-| CI sharding and `--last-failed` shorthand | Not implemented as CLI switches. Reviewed dataset/impact selection and bounded workers are available; no failure-selection or shard-merging parity is claimed. |
+| CI sharding and `--last-failed` shorthand | Implemented on suite validate/run: deterministic dependency-component partitions and verified receipt-bound unsuccessful rows with prerequisite closure. Empty/stale selections fail. Reports retain manifest/row/shard provenance; shard-report merging and distributed cross-host identity locking remain consumer responsibilities. |
 | Playwright route mocking, arbitrary evaluation/init scripts and a generic app-server launcher | Internal harnesses use trusted synthetic HTML/services. No arbitrary model/browser script execution or consumer server launcher is exposed through the recipe grammar. |
 | Kernel/EAS hosted sessions, React Native/dev-server boot, subscription providers, PR-comment reporter | These are ecosystem integrations, not mandatory framework practices. Only documented engines/external adapters and the opt-in local subscription bridge are available. Nothing posts messages/comments automatically. |
 | Anonymous telemetry and feedback uploads | No telemetry or feedback upload is implemented. Network use comes from explicitly configured target/auth/model/external tools and build/report dependencies. |
@@ -91,7 +91,7 @@ These are explicit boundaries, not implemented features hidden behind a best-pra
 
 1. Use `guide index` or the checked-in documentation index to choose the owning contract. `guide cases` explains the planning/learning/replay distinction; `guide best-practices` prints this audit.
 2. Obtain consumer-owned intent, runtime values, expected results and the authorized persona/session. Use plan/review/offline validation before UI learning where appropriate.
-3. For exploration, review the reported frontier and scope. For a suspected application defect, create an explicit consumer repro that verifies expected behavior; a tool limitation, missing seed or auth failure is not an application assertion failure.
+3. For exploration, review the reported frontier and scope, or provide a consumer charter and inspect its retained plans before explicit execution. Use the private bundle for a later authorized reproduction with repeatable data; a tool limitation, missing seed or auth failure is not an application assertion failure.
 4. Use the affected implementation module's synthetic checks for maintenance. Run `verify -Pchecks` for real-browser acceptance and inspect the actual named suites/counts. Keep the consumer Java workspace empty.
 5. Preserve exact expected outcomes, uncertain mutation errors, strict/read-only storage and private evidence boundaries. Consult [verification](VERIFICATION.md) for the recorded result scope; local fixtures do not certify paid-model quality, every Salesforce org or hosted CI.
 

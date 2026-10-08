@@ -20,31 +20,45 @@ public final class SuiteCommands {
         @Option(names="--include-tag",description="Dataset tag filter; repeatable (OR semantics).") Set<String> tags=new LinkedHashSet<>();
         @Option(names="--coverage",description="Reviewed change-impact coverage JSON; requires --changes and excludes manual filters.") Path coverage;
         @Option(names="--changes",description="JSON {schemaVersion:1,files:[repository-relative paths]}.") Path changes;
+        @Option(names="--shard",description="One-based index/count; dependency components stay together, for example 1/3.") String shard;
+        @Option(names="--last-failed",description="Verified previous suite report directory; selects unsuccessful rows and prerequisite closure.") Path lastFailed;
         ChangeImpact.Plan impact;
+        Map<String,String> previousInputs;
         List<Prepared> prepare(FrameworkConfig config) {
             Failure.require(config.profile().equals("deterministic"),"CONFIG_INVALID","Suites execute only in the deterministic profile");
             Failure.require(options.caseId==null && options.tag==null && options.testClasses.isEmpty(),"CONFIG_INVALID","Use dataset/include-tag filters for file suites");
             var suite=CaseSuite.load(file);Path parent=file.toAbsolutePath().getParent();List<Prepared> result=new ArrayList<>();
             Failure.require((coverage==null)==(changes==null),"IMPACT_INVALID","Supply both --coverage and --changes");
             List<CaseSuite.Row> selection;
-            if(coverage!=null) {
+            if(lastFailed!=null) {
+                Failure.require(coverage==null && tags.isEmpty() && datasets.isEmpty(),"CASE_INVALID","Failure selection excludes impact and manual filters");
+                SuiteReportExporter.verify(lastFailed);var receipt=Json.read(lastFailed.resolve("suite-report.json"),Map.class);
+                Failure.require(suite.id().equals(receipt.get("suiteId")),"SELECTION_STALE","Failure receipt has a different suite ID");
+                Map<String,String> outcomes=new LinkedHashMap<>();
+                previousInputs=new HashMap<>();for(Object item:(List<?>)receipt.get("datasets")) {var row=(Map<?,?>)item;String id=row.get("datasetId").toString();outcomes.put(id,row.get("status").toString());previousInputs.put(id,Objects.toString(row.get("inputHash"),""));}
+                selection=SuiteSelection.failed(suite,Objects.toString(receipt.get("suiteSourceHash"),""),outcomes);
+            } else if(coverage!=null) {
                 Failure.require(tags.isEmpty() && datasets.isEmpty(),"IMPACT_INVALID","Impact selection cannot be narrowed by manual filters");
                 impact=ChangeImpact.evaluate(suite,ChangeImpact.read(coverage,ChangeImpact.Coverage.class),ChangeImpact.read(changes,ChangeImpact.Changes.class));
                 Failure.require(!impact.selected().isEmpty(),"NO_TESTS","No changed datasets were selected; no execution or green report was created");
                 Map<String,CaseSuite.Row> indexed=new HashMap<>();suite.cases().forEach(row -> indexed.put(row.id(),row));selection=impact.selected().stream().map(indexed::get).toList();
             }else selection=suite.select(tags,datasets);
+            selection=SuiteSelection.shard(selection,shard);
             for(var row:selection) {
                 Persona persona=Persona.valueOf(row.persona());config.persona(persona);
                 var recipe=CaseRecipe.load(parent.resolve(row.recipe()).normalize());
                 var paramsInput=new CaseCommands.InputOptions();paramsInput.params=row.params()==null?null:parent.resolve(row.params()).normalize();
                 var params=paramsInput.parameters();String namespace=LocatorStore.namespace(config,persona);
                 recipe.preflight(namespace,new LocatorStore(Path.of(config.locators().dir()),namespace,config.locators().mode()),params);
-                result.add(new Prepared(row,recipe,params,persona));
+                var prepared=new Prepared(row,recipe,params,persona);
+                if(lastFailed!=null) Failure.require(inputHash(prepared,config).equals(previousInputs.get(row.id())),"SELECTION_STALE","Failure selection inputs changed; review recipes/values and create a fresh selection");
+                result.add(prepared);
             }
             return List.copyOf(result);
         }
     }
     record Prepared(CaseSuite.Row row,CaseRecipe recipe,Map<String,String> params,Persona persona) {}
+    static String inputHash(Prepared p,FrameworkConfig config) {return Json.hash(Map.of("row",SuiteSelection.rowSnapshot(p.row()),"recipe",Json.hash(p.recipe()),"parametersHash",Json.hash(p.params()),"namespace",Json.hash(LocatorStore.namespace(config,p.persona()))));}
     @Command(name="validate-suite",mixinStandardHelpOptions=true,description="Preflight selected datasets, recipes, maps and parameters without login or AI.")
     public static final class Validate implements Callable<Integer> {
         @Mixin Inputs input;
@@ -72,11 +86,13 @@ public final class SuiteCommands {
                 else exit=Math.max(exit,execution.value());
                 var state=Json.read(child.resolve("case-report.json"),Map.class);
                 if(!"PASSED".equals(state.get("status"))) exit=Math.max(exit,1);
-                completed.add(Map.of("datasetId",row.id(),"caseId",prepared.recipe().id(),"directory","cases/"+row.id(),"status",state.get("status"),"checksum",Json.hash(state),"tags",row.tags()));
+                completed.add(Map.of("datasetId",row.id(),"caseId",prepared.recipe().id(),"directory","cases/"+row.id(),"status",state.get("status"),"checksum",Json.hash(state),"tags",row.tags(),"inputHash",inputHash(prepared,config)));
             }
             Map<String,Object> suite=new LinkedHashMap<>();suite.put("schemaVersion",1);suite.put("suiteId",spec.id());suite.put("runId",root.getFileName().toString());
             suite.put("startedAt",started);suite.put("completedAt",Instant.now());suite.put("selected",rows.size());suite.put("complete",true);suite.put("status",exit==0?"PASSED":"FAILED");
             suite.put("exitCode",exit);suite.put("modelCalls",0);suite.put("datasets",completed);
+            suite.put("suiteSourceHash",SuiteSelection.sourceHash(spec));if(input.shard!=null) suite.put("shard",input.shard);
+            if(input.lastFailed!=null) suite.put("selectionSource","last-failed");
             suite.put("trendContext",Json.hash(Map.of("workers",config.execution().workers(),"rows",rows.stream().map(p -> Map.of("row",p.row(),"recipe",Json.hash(p.recipe()),"parametersHash",Json.hash(p.params()),"namespace",Json.hash(LocatorStore.namespace(config,p.persona())))).toList())));
             SuiteReportExporter.write(root,suite);
             System.out.println("Suite "+spec.id()+": "+suite.get("status")+"; datasets="+rows.size()+"; model calls=0");System.out.println("Allure report: "+root.resolve("index.html"));return exit;

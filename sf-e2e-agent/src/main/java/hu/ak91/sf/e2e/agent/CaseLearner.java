@@ -42,6 +42,10 @@ public final class CaseLearner {
         return new Plan(result.spec(),result.parameters());
     }
     public CaseRecipe learn(CaseSpec spec,String namespace,Map<String,String> params,Deadline deadline) {
+        return learn(spec,namespace,params,deadline,null);
+    }
+    public CaseRecipe learn(CaseSpec spec,String namespace,Map<String,String> params,Deadline deadline,ExplorationCharter charter) {
+        if(charter!=null) charter.validate(spec,params.keySet());
         batchTargets.clear();batchContext=null;
         Failure.require(store.writable(),"LOCATOR_READ_ONLY","Case learning requires a writable locator store");
         validateParameters(spec,params.keySet());
@@ -114,6 +118,7 @@ public final class CaseLearner {
                 step=new CaseRecipe.Step(intent.kind(),page,key,null,intent.valueRef(),intent.recordNameRef());
                 }
             }
+            if(charter!=null && CaseSpec.targeted(intent.kind())) charter.validateTarget(intent,store.get(step.page(),step.key()).primary(),params);
             if(!CaseSpec.assertion(step.kind())) budget.action();
             runner.execute(step,params);recorded.add(step);
             if(intent.instruction()!=null && !intent.kind().equals("expectHidden")) learnedTargets.put(targetKey(intent),step);

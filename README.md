@@ -10,7 +10,7 @@ Java, Maven, JUnit Jupiter and Playwright, with Allure 3 reporting. The user tes
 
 Framework-maintenance changes must keep the distribution free of org-specific business test cases. Internal checks belong to the implementation modules and use synthetic fixtures or local mock services. Target org URLs, credentials, business data and customer scenarios belong to the consuming project's private configuration and test suite.
 
-The lifecycle is **AI discovery/learning -> persistent locators and verified case recipes -> deterministic execution -> bounded retries -> confident repair and persistence**. Supply a test case as JSON or text, or discover visible navigation pages autonomously. Saved recipes rerun without AI, generated Java code or recompilation. Each installation supplies its own connection and inputs; ordinary execution and deterministic healing use no model.
+The lifecycle is **AI discovery/learning -> persistent locators and verified case recipes -> deterministic execution -> bounded retries -> confident repair and persistence**. Supply a test case as JSON or text, discover visible navigation pages, or explore workflows under consumer-owned authorization and independent oracles. Saved recipes rerun without AI, generated Java code or recompilation. Each installation supplies its own connection and inputs; ordinary execution and deterministic healing use no model.
 
 **Page Object Model is the default execution architecture.** Learning and replay use session-scoped page objects backed by the persistent locator repository; Java consumers use `sf.page(pageId)` or `sf.pages()`. Newly learned/discovered case IDs and CLI recipe filenames start with **`TST_`**. See [POM and naming](docs/PAGE_OBJECT_MODEL.md) for reuse, migration and typed business composition.
 
@@ -116,11 +116,15 @@ Choose the entry point from the information you already have. The saved artifact
 | Text case to review before target execution | `plan-case`, review, then `validate-case` | Editable specification and private parameters; no browser or target login | `learn-case --spec` to verify and create a recipe |
 | Human-readable case | `learn-case --instructions --id --route` | Planned/verified recipe; private extracted parameters when necessary | The same provider-free recipe execution |
 | Visible app navigation to inventory | `discover-ui --max-pages` | Bounded locator inventory and verified presence recipe | Replay the visited surface's presence checks |
+| Goal, authorized action instructions and independent oracles | `explore-cases --charter`; optional explicit `--execute` | Private workflow specs/repro inputs; successful learning yields verified recipes | Deterministic replay of the successful subset |
+| Connect an external agent / create app verification guidance | `mcp --workspace` / `verification-skill` | Host-gated local tools / consumer-local fingerprinted skill | Existing model-free validation/replay/report verification |
 | Existing verified recipe | `replay-case --file` | Current execution evidence and automatic Allure | Repeat with appropriate current parameters |
 | Several datasets or personas | `validate-suite`, then `run-suite` | Per-row evidence and one aggregate Allure report | Deterministic execution in a fresh context for each row |
 | Domain-specific Java assertions/setup | `run --test-class` through the coordinator | JUnit results, journals and Allure | Deterministic mapped controls and explicit expected outcomes |
 
 For a supplied case, learning is the first actual execution: it fills/clicks the requested controls and verifies the result. Plan data and preconditions before starting it. Successful replay verifies current UI state again; it does not accept the earlier run's verdict. A mapped page alone does not supply business coverage. Cases, expected outcomes and target authorization belong to the consuming project.
+
+See [autonomous workflows and agent integration](docs/AUTONOMOUS_WORKFLOWS.md) for charter examples, retained repro bundles, local MCP permissions/session tools, generated verification skills, encrypted session reuse, dependency-preserving `--shard` and explicit `--last-failed` selection. It documents the exact failure/retention boundaries and supported MCP subset.
 
 ## Prerequisites and first run
 
@@ -749,9 +753,13 @@ Framework checks do not certify target-app business coverage. Maintain a project
 | `plan-case` | Translate text into an editable specification; no target login/browser | Model only |
 | `validate-case` | Validate specification, references and runtime values offline; no YAML needed | No |
 | `discover-ui` | Map bounded visible navigation and save presence checks | Yes |
+| `explore-cases` | Plan charter-bounded workflows and retain private repro inputs; explicit `--execute` learns them | Yes |
+| `verification-skill`, `verification-skill --check` | Generate/check consumer-local verification guidance bound to reviewed inputs | No |
+| `mcp --workspace` | Serve local agent tools/resources with explicit host startup capability flags | Only model tools |
+| `session encrypt` | Protect authorized browser state in an expiring origin-bound encrypted envelope | No |
 | `replay-case` | Execute a saved recipe with current values, assertions and deterministic healing | No |
 | `validate-suite` | Preflight selected dataset recipes/maps/parameters before login | No |
-| `run-suite` | Execute datasets in isolated browsers and create a combined Allure report | No |
+| `run-suite` | Execute datasets in isolated browsers and create a combined Allure report; dependency-safe `--shard` and verified `--last-failed` available | No |
 | `plan-impact` | Create an offline reviewed changed-path selection plan with safe full-suite fallback | No |
 | `run-components` | Run explicit pinned Salesforce LWC/Jest checks and retain timestamped Allure/private diagnostics | No |
 | `run-release-matrix` | Execute pinned external Apex/Jest/API/web/mobile tools and combine distinct target/layer gates in Allure | No |
@@ -992,7 +1000,7 @@ The framework is org-independent and configured per deployment. Browser automati
 
 No claim is made that every Salesforce edition, app, customization, authentication policy and UI combination has been tested. See [implementation](docs/IMPLEMENTATION.md) and [verification](docs/VERIFICATION.md) for the checks actually performed.
 
-The latest recorded full verification, on **October 8, 2026**, passed **319 distinct internal checks in 52 suites**: 258 unit/component checks and 61 real-browser checks, with zero failures/errors/skips. It covers change-impact selection, trends, AI budgets, component/release verdicts, POM/healing, recipe compatibility, JUnit lifecycle and Allure integrity. The reference audit additionally checks strict cache immutability, pre-dispatch ambiguity/completeness, uncertain action failures, bounded state-sensitive waits, transformed secrets, actual closed-root/inaccessible PII pixels and withheld changing coverage. The usability regressions check browser-free planning, offline case/value validation, protected artifacts and discovery frontier/stop reasons; reliability checks cover changing UI state, asynchronous selection, attempt deadlines and failed/repeated runtime cleanup. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** passed. This dated inventory is not a claim that checks were rerun for every later documentation edit; use [VERIFICATION.md](docs/VERIFICATION.md) and fresh command output for the actual scope. These are implementation receipts, not hosted CI or private-org/device certification.
+The latest recorded full verification, on **October 8, 2026**, passed **342 internal checks in 59 suites**: 277 unit/component checks and 65 real-browser checks, with zero failures/errors/skips. A subsequent final CLI reproduction follow-up passed all 43 selected CLI checks, adding one new check for a combined current inventory of **343 distinct checks**; the full and scoped receipts are recorded separately in [VERIFICATION.md](docs/VERIFICATION.md). It covers change-impact selection, trends, AI budgets, component/release verdicts, POM/healing, recipe compatibility, JUnit lifecycle and Allure integrity. The reference audit additionally checks strict cache immutability, pre-dispatch ambiguity/completeness, uncertain action failures, bounded state-sensitive waits, transformed secrets, actual closed-root/inaccessible PII pixels and withheld changing coverage. The usability regressions check browser-free planning, offline case/value validation, protected artifacts and discovery frontier/stop reasons; reliability checks cover changing UI state, asynchronous selection, attempt deadlines and failed/repeated runtime cleanup. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** passed. This dated inventory is not a claim that checks were rerun for every later documentation edit; use [VERIFICATION.md](docs/VERIFICATION.md) and fresh command output for the actual scope. These are implementation receipts, not hosted CI or private-org/device certification.
 
 See the [requirement and best-practice audit](docs/REQUIREMENTS.md) for the implementation/evidence behind each requested capability.
 

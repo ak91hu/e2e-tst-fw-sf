@@ -4,6 +4,7 @@
 
 ## Contents
 
+- [October 8 audit capability follow-up](#october-8-audit-capability-follow-up)
 - [October 8 reference practice audit](#october-8-reference-practice-audit)
 - [October 8 case usability review](#october-8-case-usability-review)
 - [October 8 agent documentation review](#october-8-agent-documentation-review)
@@ -12,6 +13,20 @@
 - [Completion audit](#completion-audit)
 - [What the evidence does and does not establish](#what-the-evidence-does-and-does-not-establish)
 - [Live org validation](#live-org-validation)
+
+## October 8 audit capability follow-up
+
+The [autonomous workflow guide](AUTONOMOUS_WORKFLOWS.md) and updated [reference comparison](REFERENCE_PRACTICES.md) record the implemented follow-up: consumer-chartered UI-informed workflow planning, explicit isolated learning with unchanged oracles, confidential reproduction bundles, generated fingerprint-checked application verification skills, a host-gated local stdio MCP server/session catalog, opaque secret filling with permanent evidence prohibition, authenticated expiring encrypted session export/import, dependency-component CI shards and verified current-input-bound failed-row selection. Historical recipe/cache serialization and the empty consumer workspace are preserved. New receipt fingerprints normalize unordered resource sets.
+
+The complete Windows reactor passed `mvnw.cmd -B -ntp verify -Pchecks` on Temurin 27+35 in **8 minutes 35 seconds: 342 checks in 59 suites, comprising 277 unit/component and 65 real-browser executions**, with zero failures/errors/skips. Receipt: `.tools/audit-expansion-acceptance.log`; source-matched inventory: `.tools/audit-expansion-inventory.json`. The earlier expanded full run passed 339 checks before the CLI harness binding and final authorization guards. CLI now binds `*HarnessIT` to Failsafe under `checks`; a source-only harness was not counted as acceptance before that binding existed.
+
+The final explicit reproduction option `learn-case --charter` was added after that full run. All eight CLI unit/component suites and its real-browser harness then passed again: **43 checks, comprising 42 unit/component and one browser execution**, including the additional pre-authentication unauthorized-repro check. Command: `mvnw.cmd -B -ntp -pl sf-e2e-cli -am verify -Pchecks "-Dtest=CaseCommandsTest,GuideCommandTest,McpCommandsTest,SuiteCommandsTest,ImpactCommandsTest,ComponentCommandsTest,ReleaseCommandsTest,SfE2eCliTest" "-Dsurefire.failIfNoSpecifiedTests=false" "-Dit.test=ExplorationCommandsHarnessIT" "-Dfailsafe.failIfNoSpecifiedTests=false"`. Receipt: `.tools/audit-cli-repro-final.log`. The combined current inventory is **343 distinct checks in 59 suites: 278 unit/component and 65 browser**, zero failures/errors/skips. Repeated checks are not added twice; this is full-reactor plus scoped follow-up evidence, not a claim of a separate 343-check full run. Combined inventory: `.tools/audit-expansion-final-inventory.json`.
+
+The real-browser checks prove actual local workflow mutations followed by provider-stopped deterministic replay, refusal to substitute an unauthorized named control with zero mutation, preservation of wrong-expectation failures without another submit, owner-only failed-repro bundles, host-resolved opaque field values, PNG/trace prohibition and actual cookie/local-storage restoration from an authenticated encrypted export. `ExplorationCommandsHarnessIT` exercises production CLI orchestration with injected owner-thread local UI/model sessions; live authentication/report lifecycle have separate existing checks. It does not bypass production HTTPS policy or certify an authenticated private org CLI campaign. Fixtures contain no consumer org or customer scenario.
+
+The packaged Java 21.0.12.1+1 smoke reads all **23** offline guide topics from an isolated directory, negotiates MCP with protocol-only UTF-8 stdout, reads guide resources, rejects a tool config override and continues processing. It encrypts synthetic session state, authenticates/decrypts/re-encrypts it and rejects a wrong key before output creation. The final smoke also checks explicit charter repro validation before target credentials. Source/receipt: `.tools/AuditRuntime21.py`, `.tools/audit-runtime21-receipt.json` and `.tools/audit-runtime21-final.log`. All ten Node adapter/collector/budget checks pass (`.tools/audit-expansion-node.log`); public language/link validation and whitespace checks pass. These ignored artifacts are optional local evidence and are not prerequisites for a new checkout.
+
+Hosted integrations, full MCP HTTP/task/cancellation features, multi-agent orchestration, vision/coordinate actions and automatic business retries remain explicit adoption boundaries in the audit. No live-org, hosted-CI, paid-model quality or production throughput certification is claimed.
 
 ## October 8 reference practice audit
 

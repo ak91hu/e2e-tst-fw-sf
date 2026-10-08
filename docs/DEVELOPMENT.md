@@ -60,6 +60,7 @@ Production classes below are relative to each module's `src/main/java/hu/ak91/sf
 | Native driver / mobile | `mobile/MobileSession` | `MobileContractsTest` using local W3C-shaped services | [Advanced capabilities](ADVANCED_CAPABILITIES.md) |
 | JUnit lifecycle / junit | `junit/SelectionPlanner`, `DependencyMethodOrderer`, `RunCoordinator`, `RunSession`, `SfE2eExtension`, `SfTestContext`, `SfCase` | `SelectionPlannerTest`, `ExecutionLifecycleTest`, `LifecycleDependencyTest`, `BrowserQualityLifecycleTest` | [Test structure review](TEST_STRUCTURE_REVIEW.md) |
 | CLI / cli | `cli/SfE2eCli`, `CaseCommands`, `SuiteCommands`, `ImpactCommands`, `ComponentCommands`, `ReleaseCommands`, `TrendCommands` | `SfE2eCliTest`, `CaseCommandsTest`, `SuiteCommandsTest`, `ImpactCommandsTest`, `ComponentCommandsTest`, `ReleaseCommandsTest` | [README command reference](../README.md#command-reference) |
+| Autonomous integration / core, agent, cli, engine | `core/scenario/ExplorationCharter`, `SuiteSelection`; `core/SessionVault`; `agent/CaseExplorer`; `cli/ExplorationCommands`, `McpCommands`, `SessionCommands`, `VerificationSkillCommand`; engine secret fill/export | `ExplorationCharterTest`, `SuiteSelectionTest`, `SessionVaultTest`, `CaseExplorerTest`, `McpCommandsTest`, `SuiteCommandsTest`, `SessionSecurityHarnessIT`, `CaseWorkflowHarnessIT` | [Autonomous workflows](AUTONOMOUS_WORKFLOWS.md#implementation-and-regression-map) |
 | Node tools / scripts | `lwc-runner.mjs`, `jest-reporter.cjs`, `collect-changes.mjs`, `model-output-limit.mjs`, `run-with-env.mjs` | `component-adapter.test.mjs`, `collect-changes.test.mjs`, `model-output-limit.test.mjs` | [Efficiency workflows](EFFICIENCY_WORKFLOWS.md), [AI workflow](AI_WORKFLOW.md) |
 
 `sf-e2e-tests` is an empty integration workspace, not the home of framework regressions. `sf-e2e-cli` packages dependencies into `target/sf-e2e.jar`; the jar's existence alone does not show that checks ran.
@@ -115,7 +116,7 @@ With the browser binaries already installed:
 .\mvnw.cmd -B -ntp -pl sf-e2e-engine-playwright -am verify -Pchecks "-Dit.test=ReliabilityHarnessIT" "-Dfailsafe.failIfNoSpecifiedTests=false"
 ```
 
-Surefire checks still run in the selected reactor; Failsafe selects the named browser harness. The engine and agent POMs bind `*HarnessIT` under Maven profile `checks`. New real-browser checks in those modules must follow that naming/binding contract or explicitly update the POM and its verification scope. Failsafe results are finalized in `verify`.
+Surefire checks still run in the selected reactor; Failsafe selects the named browser harness. The engine, agent and CLI POMs bind `*HarnessIT` under Maven profile `checks`. New real-browser checks in those modules must follow that naming/binding contract or explicitly update the POM and its verification scope. Failsafe results are finalized in `verify`.
 
 ### First build and full acceptance
 

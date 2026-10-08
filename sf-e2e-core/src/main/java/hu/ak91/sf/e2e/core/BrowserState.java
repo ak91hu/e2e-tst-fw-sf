@@ -4,7 +4,7 @@ import java.nio.file.*;
 import java.net.URI;
 import java.util.*;
 
-/** Consumes an existing authorized session; never creates or exports authentication state. */
+/** Consumes authorized external plaintext or authenticated encrypted session envelopes. */
 public final class BrowserState {
     private BrowserState() {}
     public static Path path(FrameworkConfig config,Persona persona) {
@@ -13,8 +13,19 @@ public final class BrowserState {
     }
     public static String load(Path file,List<String> origins,SecretRegistry secrets) {
         try {
-            Failure.require(Files.size(file)<=4*1024*1024,"AUTH_CREDENTIAL_INVALID","Browser-state file exceeds size limit");
-            var state=Json.MAPPER.readTree(Files.readString(file));
+            Failure.require(Files.size(file)<=6*1024*1024,"AUTH_CREDENTIAL_INVALID","Browser-state file exceeds size limit");
+            String text=Files.readString(file);var node=Json.MAPPER.readTree(text);
+            if(node.has("ciphertext")) text=SessionVault.open(text,SessionVault.key(node.path("keyRef").asString(),secrets),origins,java.time.Clock.systemUTC());
+            return validate(text,origins,secrets);
+        } catch(Failure e) { throw e; } catch(Exception e) { throw new Failure("AUTH_CREDENTIAL_INVALID","Cannot read external browser-state file"); }
+    }
+    public static String validate(String input,List<String> origins,SecretRegistry secrets) {
+        try {
+            Failure.require(origins!=null && !origins.isEmpty() && origins.stream().allMatch(o -> {
+                var uri=URI.create(o);return uri.getHost()!=null && uri.getUserInfo()==null && uri.getQuery()==null && uri.getFragment()==null && (uri.getPath().isEmpty() || uri.getPath().equals("/")) && (uri.getScheme().equals("https") || uri.getScheme().equals("http") && Set.of("localhost","127.0.0.1","::1","[::1]").contains(uri.getHost()));
+            }),"AUTH_CREDENTIAL_INVALID","Session origins must be explicit HTTPS or loopback origins");
+            Failure.require(input.getBytes(java.nio.charset.StandardCharsets.UTF_8).length<=4*1024*1024,"AUTH_CREDENTIAL_INVALID","Browser-state exceeds 4 MiB");
+            var state=Json.MAPPER.readTree(input);
             Failure.require(state.isObject() && state.path("cookies").isArray() && state.path("origins").isArray(),"AUTH_CREDENTIAL_INVALID","Invalid browser-state structure");
             var hosts=origins.stream().map(o -> URI.create(o).getHost()).toList();
             for(var cookie:state.path("cookies")) {

@@ -2,7 +2,7 @@
 
 [Documentation index](README.md) · [Project README](../README.md) · [Agent instructions](../AGENTS.md) · [Development guide](DEVELOPMENT.md)
 
-The consumer workspace stays empty. Supply your own case as JSON or UTF-8 text, or ask for bounded read-only discovery. The CLI creates a private executable JSON recipe; no generated Java classes, test-module changes or recompilation are required. Configure the target and authentication as described in the [README](../README.md).
+The consumer workspace stays empty. Supply your own case as JSON or UTF-8 text, or ask for bounded read-only discovery. The CLI creates a private executable JSON recipe; no generated Java classes, test-module changes or recompilation are required. Configure the target and authentication as described in the [README](../README.md). [Autonomous workflows](AUTONOMOUS_WORKFLOWS.md) owns consumer-chartered workflow exploration/repro bundles, local MCP, generated verification skills, encrypted sessions and dependency-safe `--shard` / `--last-failed` selection.
 
 ## Contents
 
