@@ -23,6 +23,24 @@ class TestDesignReportTest {
             new CaseSpec.Step("expectValue","Input",null,null,"expected",null),
             new CaseSpec.Step("expectVisible","Result",null,null,null,null)));
     }
+    @Test void maintenanceHtmlRetainsBaselineOriginsSharedDependenciesAndEscapedRepairHistory() throws Exception {
+        var baseline=new CaseRecipe(1,"TST_design",Json.hash("fixture"),"fixture","/app",List.of(new CaseRecipe.Step("expectVisible","shared","field",null,null,null)));
+        var patch=new CaseMaintenance.Changes(1,Json.hash(baseline),List.of(new CaseMaintenance.Insertion(1,List.of(new CaseSpec.Step("expectVisible","New field",null,null,null,null)))));
+        var maintained=CaseMaintenance.plan(baseline,patch);var events=new ArrayList<Map<String,Object>>();
+        events.add(Map.of("kind","case-maintenance-plan","baselineChecksum",Json.hash(baseline),"changesChecksum",Json.hash(patch),"steps",maintained.steps(),"retainedSteps",1,"insertedSteps",1));
+        events.add(Map.of("kind","case-maintenance-dependencies","potentialSharedCases",List.of(new CaseMaintenance.SharedCase("related",Json.hash("related"),List.of("shared/field")))));
+        events.add(Map.of("kind","case-plan-ready","plan",new CaseSpec("TST_design","/app",List.of(patch.insertions().getFirst().steps().getFirst(),new CaseSpec.Step("expectVisible","Retain stored control shared/field","dialog",null,null,null)))));
+        events.add(Map.of("kind","locator-healed","page","shared","key","field","persisted",true,"reason","fingerprint","before",SemanticTarget.label("Old <script>","dialog"),"after",SemanticTarget.label("New","dialog")));
+        events.add(Map.of("kind","case-step-started","step",1));
+        events.add(Map.of("kind","case-step-learned","step",1,"implementation",new CaseRecipe.Step("expectVisible","new","field",null,null,null)));
+        var state=state("FAILED");state.put("mode","maintenance-learning");state.put("code","ACTION_COMMIT_UNCERTAIN");
+        WorkflowReportExporter.write(root,state,events,false);String html=Files.readString(root.resolve("test-design.html"));
+        assertTrue(html.contains("Maintenance review"));assertTrue(html.contains(Json.hash(baseline)));assertTrue(html.contains(Json.hash(patch)));
+        assertTrue(html.contains("New supplied step"));assertTrue(html.contains("Retained baseline step 1"));assertTrue(html.contains("related"));
+        assertTrue(html.contains("persisted: true"));assertTrue(html.contains("&lt;script&gt;"));assertFalse(html.contains("<script>"));
+        assertTrue(html.contains("Scope: dialog"));assertTrue(html.contains("NOT EXECUTED"));assertTrue(html.contains("ACTION_COMMIT_UNCERTAIN"));
+        WorkflowReportExporter.verifyEvidence(root);
+    }
     private List<Map<String,Object>> events(boolean complete) {
         var events=new ArrayList<Map<String,Object>>();
         events.add(Map.of("kind","case-instructions-interpreted","sourceSteps",List.of(1,2,3),"sourceInstructionCount",3));

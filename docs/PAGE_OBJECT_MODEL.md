@@ -97,7 +97,7 @@ Prioritize representative measurements rather than assuming a design pattern red
 | 5 | Compose shared page/component methods for repeated business intent | Default POM implemented; consumer owns named operations and assertions; no shared DOM cache |
 | 6 | Measure representative phase p50/p95, locator retries and AI calls | Implemented: automatic context-separated retained-run dashboard, unknown-cost gaps and failed-outcome visibility |
 | 7 | Select regression cases from changed metadata/components | Implemented: reviewed consumer coverage mapping, dependency closure and full-suite fallback for unknown/global changes |
-| 8 | Automate a reviewed locator-maintenance lane | Existing read-write healing plus strict restart can be orchestrated; automatic scheduled drift triage/baseline approval is future work |
+| 8 | Automate a reviewed locator-maintenance lane | `maintenance-plan` and `maintain-case` support reviewed shared repairs, additive field steps and strict restart; scheduled drift triage/baseline approval remains consumer-owned |
 
 Use the existing external-layer runner to keep component checks out of the slow browser path when appropriate. Salesforce's [LWC testing guide](https://developer.salesforce.com/docs/platform/lwc/guide/testing.html) explains that Jest component checks run without a browser or org connection; the [E2E guidance](https://developer.salesforce.com/docs/platform/lwc/guide/testing-dom-api.html) distinguishes component tests from complete UI flows. Consumer-owned LWC/Jest, Apex/API and E2E assertions should complement each other and retain separate provenance/verdicts in the combined Allure report. This framework supplies orchestration/import adapters; it does not invent the consumer's component tests.
 

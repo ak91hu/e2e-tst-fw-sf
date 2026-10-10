@@ -181,7 +181,7 @@ public final class CaseCommands {
         },root,datasetId);
     }
     private static int session(FrameworkConfig config,Persona persona,String id,String startRoute,Map<String,String> params,String mode,Path output,Work work,Path reservedRoot,String datasetId) {
-        boolean learning=!mode.equals("replay");
+        boolean learning=!Set.of("replay","maintenance").contains(mode);
         var deadline=Deadline.after(Duration.ofSeconds(config.execution().testTimeoutSeconds()));var secrets=new SecretRegistry();
         Instant startedAt=Instant.now();Path reportRoot=reservedRoot==null?ReportDirectories.create(Path.of(config.report().root()),startedAt):reservedRoot;
         String runId=reservedRoot==null?reportRoot.getFileName().toString():reportRoot.getParent().getParent().getFileName()+"."+datasetId,attemptId=UUID.randomUUID().toString();

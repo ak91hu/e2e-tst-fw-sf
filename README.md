@@ -283,6 +283,20 @@ Discovery prints and persists visited checkpoints, known remaining routes and it
 
 See [case workflows](docs/CASE_WORKFLOWS.md) for input formats, supported steps, text examples, discovery boundaries, record parameters and the external-environment launcher. The repository still ships no consumer cases.
 
+### Maintain tests after UI changes
+
+Use `maintenance-plan --file <recipe>` for a configuration-free review of the baseline checksum, retained operations and required parameters. Add repeatable `--related-recipe <recipe>` inputs to identify supplied same-context cases sharing control definitions. This is dependency information; related cases are not executed and the list does not establish complete impact coverage.
+
+```powershell
+java -jar sf-e2e-cli/target/sf-e2e.jar maintenance-plan --file .sf-e2e/cases/TST_my-flow-v1.local.json
+java -jar sf-e2e-cli/target/sf-e2e.jar maintain-case --config project.local.yaml --file .sf-e2e/cases/TST_my-flow-v1.local.json --params values.local.json --output .sf-e2e/cases/TST_my-flow-v2.local.json --locator-mode read-write
+java -jar sf-e2e-cli/target/sf-e2e.jar replay-case --config project.local.yaml --file .sf-e2e/cases/TST_my-flow-v2.local.json --params values.local.json --strict-locators --locator-mode read-only
+```
+
+A changed XPath/DOM layout with the same semantic identity needs no locator rewrite. Confident label drift repairs the existing shared key and its hashed intent aliases. Locator-only maintenance constructs no model. When a new field requires an additional input/check, supply `--changes <private JSON>` containing checksum-bound, explicitly ordered insertions and add its input/expectation values to `--params`. Insertions select bounded mapping; retained steps use their existing references, and inserted steps search the shared repository before model analysis. Expected-result references and every old action stay in order. See [the change-file format and maintenance workflow](docs/CASE_WORKFLOWS.md#maintain-existing-tests).
+
+Maintenance executes the merged workflow once, then publishes a new recipe after cleanup and report integrity succeed. Its HTML design shows baseline/new step origins, checksums, shared dependencies and actual repairs. Existing recipe files remain intact; shared locator changes and dispatched business actions may persist even after a failed attempt. Missing/ambiguous identity, changed intent or engine capability needs explicit review. Validate affected related cases separately and review consumer suite path changes.
+
 ### Structured case and runtime parameters
 
 This is an input-format illustration. Replace the route and field description with those observed in your application and save the files privately; the template contains no executable business case.
@@ -772,6 +786,8 @@ Framework checks do not certify target-app business coverage. Maintain a project
 | `mcp --workspace` | Serve local agent tools/resources with explicit host startup capability flags | Only model tools |
 | `session encrypt` | Protect authorized browser state in an expiring origin-bound encrypted envelope | No |
 | `replay-case` | Execute a saved recipe with current values, assertions and deterministic healing | No |
+| `maintenance-plan` | Review checksum-bound insertions, retained steps and supplied shared-control dependencies offline | No |
+| `maintain-case` | Verify one maintained workflow and publish a new recipe/HTML design; preserve old operations and oracles | Only for inserted steps; locator-only maintenance constructs no model |
 | `validate-suite` | Preflight selected dataset recipes/maps/parameters before login | No |
 | `run-suite` | Execute datasets in isolated browsers and create a combined Allure report; dependency-safe `--shard` and verified `--last-failed` available | No |
 | `plan-impact` | Create an offline reviewed changed-path selection plan with safe full-suite fallback | No |
@@ -937,7 +953,7 @@ report/
     allure-generation.json
     allure-generation.log
     case-report.json           # file workflows; run-report.json for JUnit
-    test-design.html           # learning after a design was established, including failed attempts
+    test-design.html           # learning/maintenance design and outcomes, including failed attempts
     attempts/
   2026-10-06_09-12-05.007100000Z/
     ...
@@ -995,6 +1011,9 @@ For dataset CI, restore reviewed maps/recipes and provision private parameter/se
 | `LOCATOR_INCOMPLETE` / `AUTOMATION_UNSUPPORTED` | Inspect frame approval, Shadow DOM coverage, scope cardinality and observation limits |
 | `MAPPING_UI_CHANGED` | Wait for a stable app state and repeat mapping; the failed scope was not written |
 | `LOCATOR_CONFLICT` | Reload the latest repository before retrying a competing write |
+| `CASE_MAINTENANCE_CONFLICT` | Recreate/review changes against the current baseline recipe checksum |
+| `CASE_MAINTENANCE_INVALID` | Check insertion positions, supported steps, required references and the final assertion; existing steps cannot be replaced |
+| `CASE_RECIPE_EXISTS` / `CASE_OUTPUT_BUSY` | Choose a new versioned output or wait for the current publisher; earlier recipes are preserved |
 | `ACTION_COMMIT_UNCERTAIN` | Check the business outcome and journal before considering another action |
 | `MODEL_PROVIDER_FAILED` | Check the configured mapping provider's authorization/availability |
 | `AI_BUDGET_EXHAUSTED` | Inspect reservations and physical attempts; narrow scope or review the explicit allowance before another run |
@@ -1015,7 +1034,7 @@ The framework is org-independent and configured per deployment. Browser automati
 
 No claim is made that every Salesforce edition, app, customization, authentication policy and UI combination has been tested. See [implementation](docs/IMPLEMENTATION.md) and [verification](docs/VERIFICATION.md) for the checks actually performed.
 
-The latest recorded full verification, on **October 10, 2026**, passed **371 internal checks in 61 suites**: 305 unit/component checks and 66 browser checks, with zero failures/errors/skips. Subsequent CLI checks passed all 47 then-current CLI checks and 20 final publication/guide/browser checks, adding three regressions for **374 distinct checks** across the full and scoped runs. The [final review receipt](docs/VERIFICATION.md#october-10-final-code-review) records exact commands and corrected publication/report-integrity findings. Coverage includes ordered planning, cross-case/restart target reuse without duplicate definitions, independent wrong-result rejection, provider-free replay, recipe compatibility, owner-thread cleanup, masking, JUnit/dataset verdicts and Allure integrity. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** passed. These are local synthetic implementation checks, not hosted CI, private-org/device certification or paid-provider savings. Historical receipts remain in [VERIFICATION.md](docs/VERIFICATION.md); current command output establishes the scope of each later change.
+The latest recorded full verification, on **October 10, 2026**, passed **401 internal checks in 65 suites**: 333 unit/component checks and 68 browser checks, with zero failures/errors/skips. The final historical-ID maintenance guard passed a scoped 69-check follow-up, adding one regression for **402 distinct checks** across the full and scoped runs. The [maintenance receipt](docs/VERIFICATION.md#october-10-case-maintenance) records exact commands and scope; the [final review receipt](docs/VERIFICATION.md#october-10-final-code-review) retains the earlier publication/report-integrity findings. Coverage includes ordered planning, cross-case/restart target reuse without duplicate definitions, additive new-field maintenance, shared repairs and dependency review, independent wrong-result rejection, provider-free replay, historical recipe compatibility, owner-thread cleanup, masking, JUnit/dataset verdicts and Allure integrity. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** passed. These are local synthetic implementation checks, not hosted CI, private-org/device certification or paid-provider savings. Historical receipts remain in [VERIFICATION.md](docs/VERIFICATION.md); current command output establishes the scope of each later change.
 
 See the [requirement and best-practice audit](docs/REQUIREMENTS.md) for the implementation/evidence behind each requested capability.
 

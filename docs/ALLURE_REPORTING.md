@@ -61,7 +61,7 @@ Names encode the actual start instant as `yyyy-MM-dd_HH-mm-ss.SSSSSSSSSZ` in UTC
 | `allure-generation.json` | Engine/version, generation timestamp and HTML checksum |
 | `allure-generation.log` | Output of the actual Allure renderer |
 | `case-report.json` or `run-report.json` | Structured execution data used for rebuilding |
-| `test-design.html` | Learning's interpreted design and implementation outcomes, also attached to Allure; absent before a plan is established |
+| `test-design.html` | Learning/maintenance interpreted design and implementation outcomes, also attached to Allure; maintenance includes baseline/new step origins, checksums, potential shared dependencies and actual repairs; absent before a plan is established |
 | `suite-report.json`, `cases/<dataset-id>/` | Aggregate dataset verdicts/checksums and isolated original row evidence |
 | `quality-summary.json`, per-attempt `browser-diagnostics.json` | Assertion, drift/retry, model-call event and browser-quality metrics |
 | `attempts/` | Original evidence, artifact manifests and redacted event journals |

@@ -44,6 +44,7 @@ final class CaseTargetReuse {
         return match(entry,intent,fresh,parameters)!=null;
     }
     void remember(CaseSpec.Step intent,LocatorEntry entry) {index.remember(intent,entry);}
+    void repaired(LocatorEntry before,LocatorEntry after) {index.rebind(before,after);}
     private Observation.Node match(LocatorEntry entry,CaseSpec.Step intent,Observation observation,Map<String,String> parameters) {
         if(!entry.engineVersion().equals(engine) || !entry.route().equals(LocatorEntry.routeKey(observation.route())) ||
             !Objects.equals(entry.primary().container(),intent.container()) || entry.parameterized()!=(intent.recordNameRef()!=null)) return null;

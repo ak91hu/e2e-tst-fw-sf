@@ -4,6 +4,7 @@
 
 ## Contents
 
+- [October 10 case maintenance](#october-10-case-maintenance)
 - [October 10 final code review](#october-10-final-code-review)
 - [October 8 audit capability follow-up](#october-8-audit-capability-follow-up)
 - [October 8 reference practice audit](#october-8-reference-practice-audit)
@@ -14,6 +15,22 @@
 - [Completion audit](#completion-audit)
 - [What the evidence does and does not establish](#what-the-evidence-does-and-does-not-establish)
 - [Live org validation](#live-org-validation)
+
+## October 10 case maintenance
+
+`maintenance-plan` now reviews checksummed baseline recipes, additive insertions and explicitly supplied shared-control dependencies offline. `maintain-case` executes one merged workflow, retains every original action/control/oracle reference and publishes a new recipe only after owned-session cleanup and final report/evidence validation. Locator-only maintenance constructs no model client; inserted targets check the repository before bounded mapping. Proven shared repairs retain the same key and update its hashed intent aliases. The maintenance HTML contains baseline/changes checksums, old/new step origins, recorded repairs, potential shared dependencies and actual outcomes. Existing recipe/locator serialization, historical IDs and the empty consumer workspace remain compatible.
+
+The full Windows reactor passed `mvnw.cmd -B -ntp verify -Pchecks` on Temurin 27+35 in **7 minutes 36 seconds: 401 checks in 65 suites, comprising 333 unit/component and 68 browser executions**, with zero failures/errors/skips. Receipt: `.tools/maintenance-acceptance.log`. The new local browser fixtures verify an extra required field plus label drift with one new target call and one submission, shared-key persistence, a fresh provider-free strict restart, retained wording aliases and a changed DOM/XPath layout requiring no model or map rewrite. Core/agent/CLI/reporting regressions cover stale patch checksums, ordered bounded insertions, unchanged existing actions/oracles, missing/invalid parameters, explicit dependencies, wrong expectations, uncertain mutations without retries, corrupted alias finalization preserving the primary failure, escaped maintenance HTML and integrity verification.
+
+A final compatibility guard prevents internal new-case naming rules from rejecting historical recipe IDs, including a 70-character unprefixed ID. It preserves the original recipe and report identity. The final source passed:
+
+```powershell
+.\mvnw.cmd -B -ntp -pl sf-e2e-cli -am verify -Pchecks "-Dtest=CaseMaintenanceTest,CaseLearnerTest,CaseTargetReuseTest,MaintenanceCommandsTest,TestDesignReportTest,GuideCommandTest" "-Dsurefire.failIfNoSpecifiedTests=false" "-Dit.test=CaseMaintenanceHarnessIT,CaseWorkflowHarnessIT,ExplorationCommandsHarnessIT" "-Dfailsafe.failIfNoSpecifiedTests=false"
+```
+
+That follow-up passed **69 checks in 10 suites: 58 unit/component and 11 browser**, with zero failures/errors/skips, in 3 minutes 7 seconds. Receipt: `.tools/maintenance-compatibility.log`. It adds one distinct regression to the full-run inventory: **402 distinct checks in 65 suites, comprising 334 unit/component and 68 browser** across the full and scoped runs. Repeated executions are not added twice; this is not a separate 402-check full run. `GuideCommandTest` verifies every bundled public topic. Final Markdown receipt updates are validated and repackaged separately.
+
+All ten Node adapter/collector/budget checks passed `node --test scripts/model-output-limit.test.mjs scripts/component-adapter.test.mjs scripts/collect-changes.test.mjs`: `.tools/maintenance-node.log`. Ignored receipts are optional local evidence. The new maintenance fixtures use synthetic HTML and scripted model responses; existing acceptance also uses local HTTP/W3C services. This evidence does not establish private-org authentication/compatibility, hosted CI, paid-provider savings, production throughput or a complete application dependency inventory. Shared locators and dispatched application changes can persist during a failed attempt; a passing related-case verdict requires its own execution.
 
 ## October 10 final code review
 

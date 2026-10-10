@@ -6,7 +6,8 @@ The consumer workspace stays empty. Supply your own case as JSON or UTF-8 text, 
 
 ## Contents
 
-- [Five commands](#five-commands)
+- [Case commands](#case-commands)
+- [Maintain existing tests](#maintain-existing-tests)
 - [Review a plan before executing](#review-a-plan-before-executing)
 - [A supplied structured case](#a-supplied-structured-case)
 - [A supplied text case](#a-supplied-text-case)
@@ -19,7 +20,7 @@ The consumer workspace stays empty. Supply your own case as JSON or UTF-8 text, 
 - [Dataset suites and quality gates](#dataset-suites-and-quality-gates)
 - [Existing external environment / subscription](#existing-external-environment-subscription)
 
-## Five commands
+## Case commands
 
 | Command | Input | Result | Model on later runs |
 | --- | --- | --- | --- |
@@ -28,10 +29,68 @@ The consumer workspace stays empty. Supply your own case as JSON or UTF-8 text, 
 | `learn-case` | Your structured case or text instructions and runtime parameters | A recipe after every action/assertion succeeds; persistent locators for its visited states | None with `replay-case` |
 | `discover-ui` | Start route, case ID, hard page budget | AI mapping of visible navigation pages and a recipe of verified presence checks | None with `replay-case` |
 | `replay-case` | A saved recipe, matching configuration/persona, runtime parameters | Deterministic actions/assertions, locator retry/healing, evidence and attempt journal | No model client is constructed |
+| `maintenance-plan` | A checksummed baseline recipe, optional additive changes and explicit related recipes | Offline retained/inserted step plan, required parameter names and potential shared-control dependencies | No configuration, browser, model or writes |
+| `maintain-case` | The same baseline, optional reviewed insertions, target configuration and runtime values | One verified merged workflow, a new versioned recipe and HTML maintenance design | Locator-only maintenance constructs no model; insertions use bounded mapping/repository-first reuse |
 
 Learning performs the supplied actions. For a write workflow, provide its complete steps, runtime data and expected outcome. Discovery follows eligible navigation hrefs without submitting forms or clicking action buttons. Its smoke checks establish UI presence, not business-process correctness.
 
 Page Object Model is the default for learning and replay. Controls are grouped by route context into revision-isolated page models; persistent `page`/`key` references remain the recipe contract. New IDs and CLI output filenames automatically receive `TST_` if absent; existing historical recipes keep their original IDs/checksums. The prefix counts toward the 70-character ID limit. Use the actual printed output path for replay/suite entries. See [POM and naming](PAGE_OBJECT_MODEL.md).
+
+## Maintain existing tests
+
+Maintenance distinguishes layout drift from changed business intent. A moved element or changed XPath often needs no update because recipes use semantic controls, not raw XPath strings. A renamed label with sufficient independent identity evidence can repair its shared `page`/`key` definition. Exact origin, route/query, frame/scope, engine capability, completeness, confidence and ambiguity checks still apply. Missing/conflicting identity evidence stops maintenance; there is no automatic confidence reduction, arbitrary XPath substitution or replacement of expected outcomes.
+
+Start with a checksummed recipe produced by learning. This offline command prints its baseline checksum, retained steps and required parameter names without opening the target:
+
+```powershell
+java -jar sf-e2e-cli/target/sf-e2e.jar maintenance-plan --file .sf-e2e/cases/TST_my-flow-v1.local.json --related-recipe .sf-e2e/cases/TST_related.local.json
+```
+
+`--related-recipe` is repeatable and optional, with at most 200 supplied recipes. The plan lists only supplied recipes in the same namespace and engine capability that share existing control references. This is potential dependency information: those cases are not executed, references need not actually drift, and unlisted recipes or handwritten Java tests are outside the analysis. It does not change a suite manifest or claim complete application impact coverage. Optional `--params` validates values without printing them.
+
+For locator-only maintenance, omit `--changes`:
+
+```powershell
+java -jar sf-e2e-cli/target/sf-e2e.jar maintain-case --config project.local.yaml --file .sf-e2e/cases/TST_my-flow-v1.local.json --params values.local.json --output .sf-e2e/cases/TST_my-flow-v2.local.json --locator-mode read-write
+```
+
+This selects `deterministic`, constructs no model client and executes the existing workflow once through its POM references. Confident repairs update the shared locator repository, including hashed intent associations for the repaired key, rather than creating duplicate definitions. Other recipes using that key receive the repaired definition on their next fresh resolution. Existing recipe files, historical IDs and expected-result references remain unchanged. When no repair is necessary, the new recipe can have the same checksum as the baseline. Use fresh strict/read-only replay afterward to verify the persisted map without further healing.
+
+### Add a field without relearning the case
+
+An extra field does not authorize an inferred value, additional save or changed expected result. Supply explicit operations and private runtime values. Save a private `changes.local.json`, replacing the checksum with `baselineChecksum` from `maintenance-plan`:
+
+```json
+{
+  "schemaVersion": 1,
+  "baselineChecksum": "REPLACE_WITH_THE_BASELINE_RECIPE_SHA256",
+  "insertions": [
+    {
+      "beforeStep": 2,
+      "steps": [
+        {"kind": "fill", "instruction": "New field label in your application", "valueRef": "newField"},
+        {"kind": "expectValue", "instruction": "New field label in your application", "valueRef": "expectedNewField"}
+      ]
+    }
+  ]
+}
+```
+
+`beforeStep` is a **1-based position in the unchanged baseline**, not the growing merged case. In a fill/save/check recipe, position 2 places the new field before Save. Choose the actual position in your case; framework fixtures supply no business-stage assumption. Insertions must have unique ascending positions and retain their supplied order. Position `baseline step count + 1` appends steps, which must end in a caller-supplied assertion. The merged case is limited to 200 steps. Changes can only insert steps: unknown replacement/removal/value fields are rejected, and a mismatched baseline checksum fails before authentication. A deliberate change to existing actions, routes, controls or oracle references requires a separately reviewed full specification and normal learning.
+
+Add `newField` and `expectedNewField` explicitly to the private parameter file, alongside all existing parameters. Use the actual observed field label and named `scope` when needed. Then review and execute:
+
+```powershell
+java -jar sf-e2e-cli/target/sf-e2e.jar maintenance-plan --file .sf-e2e/cases/TST_my-flow-v1.local.json --changes changes.local.json --params values.local.json --related-recipe .sf-e2e/cases/TST_related.local.json
+java -jar sf-e2e-cli/target/sf-e2e.jar maintain-case --config project.local.yaml --file .sf-e2e/cases/TST_my-flow-v1.local.json --changes changes.local.json --params values.local.json --related-recipe .sf-e2e/cases/TST_related.local.json --output .sf-e2e/cases/TST_my-flow-v2.local.json --locator-mode read-write
+java -jar sf-e2e-cli/target/sf-e2e.jar replay-case --config project.local.yaml --file .sf-e2e/cases/TST_my-flow-v2.local.json --params values.local.json --strict-locators --locator-mode read-only
+```
+
+Insertions select the `mapping` profile and require its model credential, even when repository reuse avoids all target calls. Every retained step executes directly through its original recipe reference, without target analysis; every inserted visible target checks the repository first. Only unknown targets need bounded model interpretation. Retained steps are excluded from paid target batches. Newly supplied negative assertions still require the same target to have been observed in the current learning workflow; historical knowledge alone cannot prove absence.
+
+The single merged execution retains original order, action kinds, locator keys, parameter references and assertions. Original and inserted expected values are read only from the supplied parameters; maintenance never copies observed values into them. A dispatched uncertain mutation stops the attempt without automatic retry. The HTML `test-design.html` marks retained baseline positions and new supplied steps, baseline/changes checksums, potential shared dependencies, actual before/after repairs and outcomes. Failed attempts retain their design, evidence and journal when reporting can complete. Related cases have no new verdict merely because they share a repaired control. Historical recipe IDs and their report identity are preserved, including older naming conventions.
+
+New recipe publication follows successful browser cleanup and final report/evidence verification; existing output paths are protected by the same publication lock as learning. Shared repairs and new locator definitions may already persist during an ultimately failed attempt, and business actions may already have committed. Maintenance supplies no transaction rollback and never automatically reruns the case to compensate. Review the journal before any explicit rerun, validate each relevant related case with caller-owned data, and update consumer suite paths through review. Use version control for reviewed recipes/maps and preserve locator history; this command does not overwrite or migrate old recipes or engine capabilities.
 
 ## Review a plan before executing
 
