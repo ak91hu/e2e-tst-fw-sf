@@ -51,28 +51,30 @@ class CaseLearnerTest {
         var engine=new Engine();var disk=store();
         var successful=new ScriptedModelClient(r -> { assertFalse(Json.string(r).contains("PRIVATE_UI_VALUE"));return response(Map.of("nodeId","field")); });
         var recipe=learner(engine,disk,successful).learn(spec(),"test",Map.of(),deadline);var original=Map.copyOf(disk.entries());
+        var originalNodes=engine.nodes;
+        engine.nodes=List.of(new Observation.Node("field",new SemanticTarget("textbox","Changed name","Changed name","page"),"","",false,false,Map.of("tag","input","apiName","Changed__c")));
         var failed=new ScriptedModelClient(r -> response(Map.of("nodeId","unknown")));
         assertThrows(Failure.class,() -> learner(engine,disk,failed).learn(spec(),"test",Map.of(),deadline));
-        assertEquals(original,disk.entries());new CaseRunner(engine,disk,FrameworkConfig.defaults(),deadline,e -> {}).run(recipe,"test",disk,Map.of());
+        assertEquals(original,disk.entries());engine.nodes=originalNodes;new CaseRunner(engine,disk,FrameworkConfig.defaults(),deadline,e -> {}).run(recipe,"test",disk,Map.of());
     }
     @Test void generatedPlanCannotInventParameterReferences() {
         var engine=new Engine();var disk=store();
-        var model=new ScriptedModelClient(r -> response(Map.of("steps",List.of(Map.of("kind","expectText","instruction","Result","valueRef","invented")))));
+        var model=new ScriptedModelClient(r -> response(Map.of("steps",List.of(Map.of("kind","expectText","instruction","Result","valueRef","invented","sourceInstruction",1)))));
         assertEquals("CASE_PARAMETER_REQUIRED",assertThrows(Failure.class,() -> learner(engine,disk,model).plan("user-case","/app","Check result ${expected}",Set.of("expected"),deadline)).code());
         assertEquals(0,engine.opens);assertEquals(0,engine.actions);
     }
     @Test void textLiteralParametersAreReturnedSeparatelyAndNeverInTheRecipe() {
         var engine=new Engine();var disk=store();
-        var model=new ScriptedModelClient(r -> response(Map.of("steps",List.of(Map.of("kind","expectText","instruction","Result","valueRef","expected")),"parameters",Map.of("expected","READY"))));
+        var model=new ScriptedModelClient(r -> response(Map.of("steps",List.of(Map.of("kind","expectText","instruction","Result","valueRef","expected","sourceInstruction",1)),"parameters",Map.of("expected","READY"))));
         var result=learner(engine,disk,model).planWithParameters("user-case","/app","Verify that Result displays exactly \"READY\".",Set.of(),deadline);
         assertEquals(Map.of("expected","READY"),result.parameters());assertEquals("expected",result.spec().steps().getFirst().valueRef());
         assertFalse(Json.string(result.spec()).contains("READY"));assertEquals(0,engine.actions);
     }
     @Test void textPlannerCannotInventLiteralValuesOrOverrideCallerParameters() {
         var engine=new Engine();var disk=store();
-        var invented=new ScriptedModelClient(r -> response(Map.of("steps",List.of(Map.of("kind","expectText","instruction","Result","valueRef","expected")),"parameters",Map.of("expected","INVENTED"))));
+        var invented=new ScriptedModelClient(r -> response(Map.of("steps",List.of(Map.of("kind","expectText","instruction","Result","valueRef","expected","sourceInstruction",1)),"parameters",Map.of("expected","INVENTED"))));
         assertEquals("MODEL_OUTPUT_INVALID",assertThrows(Failure.class,() -> learner(engine,disk,invented).planWithParameters("user-case","/app","Expect READY",Set.of(),deadline)).code());
-        var override=new ScriptedModelClient(r -> response(Map.of("steps",List.of(Map.of("kind","expectText","instruction","Result","valueRef","expected")),"parameters",Map.of("expected","READY"))));
+        var override=new ScriptedModelClient(r -> response(Map.of("steps",List.of(Map.of("kind","expectText","instruction","Result","valueRef","expected","sourceInstruction",1)),"parameters",Map.of("expected","READY"))));
         assertEquals("MODEL_OUTPUT_INVALID",assertThrows(Failure.class,() -> learner(engine,disk,override).planWithParameters("user-case","/app","Expect READY",Set.of("expected"),deadline)).code());
         assertEquals(0,engine.actions);
     }

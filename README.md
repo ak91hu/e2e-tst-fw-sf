@@ -10,7 +10,7 @@ Java, Maven, JUnit Jupiter and Playwright, with Allure 3 reporting. The user tes
 
 Framework-maintenance changes must keep the distribution free of org-specific business test cases. Internal checks belong to the implementation modules and use synthetic fixtures or local mock services. Target org URLs, credentials, business data and customer scenarios belong to the consuming project's private configuration and test suite.
 
-The lifecycle is **AI discovery/learning -> persistent locators and verified case recipes -> deterministic execution -> bounded retries -> confident repair and persistence**. Supply a test case as JSON or text, discover visible navigation pages, or explore workflows under consumer-owned authorization and independent oracles. Saved recipes rerun without AI, generated Java code or recompilation. Each installation supplies its own connection and inputs; ordinary execution and deterministic healing use no model.
+The supplied-case lifecycle is **ordered intent -> interpreted test design -> reuse existing controls or identify new ones -> verified recipe and HTML design -> deterministic replay**. Supply a test case as JSON or text, discover visible navigation pages, or explore workflows under consumer-owned authorization and independent oracles. Saved recipes rerun without AI, generated Java code or recompilation, with bounded locator retries and confident repair. Each installation supplies its own connection and inputs; ordinary execution and deterministic healing use no model.
 
 **Page Object Model is the default execution architecture.** Learning and replay use session-scoped page objects backed by the persistent locator repository; Java consumers use `sf.page(pageId)` or `sf.pages()`. Newly learned/discovered case IDs and CLI recipe filenames start with **`TST_`**. See [POM and naming](docs/PAGE_OBJECT_MODEL.md) for reuse, migration and typed business composition.
 
@@ -112,9 +112,9 @@ Choose the entry point from the information you already have. The saved artifact
 | Starting point | Initial command | Produced artifact | Later execution |
 | --- | --- | --- | --- |
 | Known route and reusable controls | `map-ui` with an explicit page/route or plan | Versioned semantic locator map | `verify-ui` or project-owned deterministic Java cases |
-| Written business case | `learn-case --spec` | Verified recipe and state-specific locator keys | `replay-case` or dataset `run-suite` |
+| Written business case | `learn-case --spec` | Verified recipe, reused/new locator references and HTML test design | `replay-case` or dataset `run-suite` |
 | Text case to review before target execution | `plan-case`, review, then `validate-case` | Editable specification and private parameters; no browser or target login | `learn-case --spec` to verify and create a recipe |
-| Human-readable case | `learn-case --instructions --id --route` | Planned/verified recipe; private extracted parameters when necessary | The same provider-free recipe execution |
+| Human-readable case | `learn-case --instructions --id --route` | Ordered interpreted design, verified recipe and HTML; private extracted parameters when necessary | The same provider-free recipe execution |
 | Visible app navigation to inventory | `discover-ui --max-pages` | Bounded locator inventory and verified presence recipe | Replay the visited surface's presence checks |
 | Goal, authorized action instructions and independent oracles | `explore-cases --charter`; optional explicit `--execute` | Private workflow specs/repro inputs; successful learning yields verified recipes | Deterministic replay of the successful subset |
 | Connect an external agent / create app verification guidance | `mcp --workspace` / `verification-skill` | Host-gated local tools / consumer-local fingerprinted skill | Existing model-free validation/replay/report verification |
@@ -138,7 +138,7 @@ Start with this sequence:
 2. Run `doctor` and `list --json` without credentials to inspect the empty template.
 3. Create a private target YAML configuration and supply external credentials/session references.
 4. Use `learn-case` for a supplied case, `discover-ui` for bounded navigation discovery, or `map-ui` for a reusable locator map.
-5. Inspect the saved recipe/locators and rerun the recipe with `replay-case`.
+5. Inspect the printed `test-design.html`, saved recipe and reused/new locator references, then rerun the recipe with `replay-case`.
 6. Open the printed `report/<UTC timestamp>/index.html` to inspect Allure steps and screenshots.
 
 The initial learning run executes the supplied actions and assertions. Choose runtime data and expected results appropriate for your target. Subsequent runs execute the saved steps against the current UI and independently verify those assertions.
@@ -264,6 +264,8 @@ Lightning, Classic and Experience/custom application routes are accepted on conf
 
 ## Learn cases and replay without AI
 
+Write text instructions in execution order, preferably one explicit action/assertion per nonblank line. Planning validates ordered source-line coverage. Learning establishes its interpreted design before case actions and publishes `test-design.html` after the attempt, also attached to Allure, with planned steps, parameter references, implementation locators and completed/unfinished/unexecuted outcomes. See [instruction order and HTML design](docs/CASE_WORKFLOWS.md#instruction-order-and-implemented-html-design) for validation, privacy and compatibility limits.
+
 Use the file workflow when you have a supplied test case and want to rerun it without writing Java:
 
 ```powershell
@@ -271,7 +273,7 @@ java -jar sf-e2e-cli/target/sf-e2e.jar learn-case --config project.local.yaml --
 java -jar sf-e2e-cli/target/sf-e2e.jar replay-case --config project.local.yaml --file .sf-e2e/cases/TST_my-flow-v1.local.json --params values.local.json --locator-mode read-write
 ```
 
-`learn-case` accepts structured steps, or `--instructions <UTF-8 file> --id <id> --route <start route>` for a text case. Text can contain parameter references or literal inputs/expectations; extracted literals must match the supplied text verbatim and are saved in a separate private parameter file. AI identifies targets from the actual UI; deterministic code executes the specified actions and verifies caller-supplied expectations. A case must end in an assertion. Successful learning saves a checksummed JSON recipe and state-specific locators; inputs/expected values stay outside the recipe. Existing recipes are preserved by requiring a new output path for re-learning.
+`learn-case` accepts structured steps, or `--instructions <UTF-8 file> --id <id> --route <start route>` for a text case. Text can contain parameter references or literal inputs/expectations; extracted literals must match the supplied text verbatim and are saved in a separate private parameter file. Each targeted step first checks the current namespace's existing controls; AI identifies unknown targets from the actual UI. Deterministic code executes the specified actions and verifies caller-supplied expectations. A case must end in an assertion. Successful learning saves a checksummed JSON recipe using existing locator references plus isolated definitions for new or changed identities; inputs/expected values stay outside the recipe. Existing recipes are preserved by requiring a new output path for re-learning.
 
 For an editable preview, use `plan-case --instructions <file> --id <id> --route <route> --output <new spec> --config <project YAML>`. Planning uses only the configured model, with no target login, browser or locator writes. Review the saved specification/expected values, then use `validate-case --spec <spec> --params <private values>` for credential-free offline validation and `learn-case --spec` for actual UI verification. A plan is not a replayable recipe. See [the review workflow](docs/CASE_WORKFLOWS.md#review-a-plan-before-executing).
 
@@ -307,11 +309,11 @@ This is an input-format illustration. Replace the route and field description wi
 }
 ```
 
-The learning command above maps each target and verifies the expected field value before publishing the recipe. For another execution, provide the desired values through `--params`. Recipes store references, routes and locator keys; runtime inputs/expected values remain in the separate parameter file. Learning an existing recipe again requires a new output filename, preserving the older version.
+The learning command above reuses or learns each target and verifies the expected field value before publishing the recipe. For another execution, provide the desired values through `--params`. Recipes store references, routes and locator keys; runtime inputs/expected values remain in the separate parameter file. Learning an existing recipe again requires a new output filename, preserving the older version.
 
 ### Text instructions
 
-Write a UTF-8 `flow.local.txt` with explicit actions and an expected result:
+Write a UTF-8 `flow.local.txt` with one explicit instruction per nonblank line, in execution order, including intermediate checks and a final expected result:
 
 ```text
 Enter ${reference} into the field labelled Reference.
@@ -324,6 +326,18 @@ java -jar sf-e2e-cli/target/sf-e2e.jar replay-case --config project.local.yaml -
 ```
 
 Literal inputs/expectations may also appear in the text. Validated literals are saved into `<recipe filename>.params.local.json`; use that file with replay. AI cannot invent a missing expected result or replace caller-supplied values.
+
+### Ordered design, shared controls and HTML handoff
+
+Text planning associates every generated step with a source instruction line. It rejects omitted or reordered lines; one line may expand into several consecutive steps. Supply at most 200 nonblank lines and 200 generated steps. This establishes ordered line coverage, while the user still reviews whether the interpreted actions and assertions match the intended meaning. For an editable review before execution, use `plan-case`, review its specification and separate values, then `validate-case` and `learn-case --spec`.
+
+Before the first case action, learning records its complete interpreted design. When the attempt finishes, open the printed `report/<timestamp>/test-design.html`, also attached to Allure as **Implemented test design**. It lists planned operations, targets/scopes/routes, input and expected-result references, implemented page/locator keys and each step's outcome. Runtime parameter values are omitted. A failed attempt retains completed, started-but-unfinished and unexecuted steps whenever a plan was established; a completed step cannot override a failed final verdict. CLI publication waits for successful browser/session cleanup and report finalization before saving the recipe or extracted parameters. Source line numbers appear for direct text learning; a reviewed `--spec` supplies the design's ordered steps directly.
+
+Control reuse is mandatory across cases and learner/browser restarts within the same namespace. Complete fresh observations must prove the exact route, engine, scope, frame, stored attributes and unique identity. Known controls need no new target-identification call or duplicate locator write and are excluded from AI target batches. New wording may need one interpretation call, followed by an existing-definition check; that wording's validated association is then retained for later cases. Changed or ambiguous identities cannot authorize automatic reuse.
+
+Keep each locator map and its adjacent `<locator filename>.target-index.json` when transferring the learned workspace. The auxiliary file contains hashed instruction/context associations and locator references; the map remains the sole control-definition store. Removing the auxiliary file loses learned wording associations; exact semantic names/API names/test IDs can still locate existing mapped controls. Its integrity checks do not change historical recipe or locator checksums. See [case design and reporting](docs/CASE_WORKFLOWS.md#instruction-order-and-implemented-html-design) and [reuse contracts](docs/AI_WORKFLOW.md#smaller-requests-bounded-batches-and-unchanged-maps).
+
+Reuse reduces repeated target-identification work. New text still needs planning, and learning initializes its configured model credentials even if all targets are known. Authentication, current actions/assertions, browser observations, screenshots and report generation still run; a later case is therefore not guaranteed to have a lower total cost.
 
 ### Autonomous discovery
 
@@ -348,7 +362,7 @@ For record-link targets, use `recordNameRef` to bind the current caller-supplied
 
 ## Default Page Object Model and test names
 
-No flag is required to enable POM. `CaseRunner` dispatches every targeted learning/replay operation through `PageObjects`/`PageObject`; expected outcomes remain in the case. The recipe's `page`/`key` references and checksummed locator map define each reusable model. Learning groups controls by route context with a separate revision per attempt, protecting older recipes when a new learning attempt fails. Autonomous discovery follows the same model naming policy. Historical schema-1 recipes use POM on replay without checksum or ID changes.
+No flag is required to enable POM. `CaseRunner` dispatches every targeted learning/replay operation through `PageObjects`/`PageObject`; expected outcomes remain in the case. The recipe's `page`/`key` references and checksummed locator map define each reusable model. Learning reuses proven existing page/control keys across cases and assigns separate revisions only to new or changed identities, protecting older recipes when a new attempt fails. Autonomous discovery follows the same model naming policy. Historical schema-1 recipes use POM on replay without checksum or ID changes.
 
 Java cases use `sf.page(pageId)` for mapped controls and `sf.pages().open(route)` for navigation. Compose these objects into project-owned typed page/component classes when you need named business methods. The registry reuses wrappers within one persona/session/worker, while every action/read observes the current UI. No DOM node, field value or observation is cached in a page object. Existing confidence, route/frame, ambiguity, pre-dispatch retry and repair-persistence rules remain authoritative. `sf.locators()` remains available as a low-level compatibility API.
 
@@ -363,8 +377,8 @@ AI learning, mapping and autonomous discovery use the repository's `AiWorkflowCl
 | Stage | Cost control and quality contract |
 | --- | --- |
 | Supplied intent | Structured JSON avoids a text-planning call; text planning shares the learning budget |
-| Prior target | Reuse only the same intent/scope/record reference after fresh unique strict resolution and permitted-role checks |
-| Upcoming visible targets | Batch up to 8 same-scope intents; rematch each semantic descriptor in fresh complete UI before its step |
+| Existing target across cases | Always search existing definitions and hashed instruction associations; fresh exact context/identity checks authorize reuse without another target call or duplicate definition |
+| Upcoming visible targets | Batch up to 8 unknown same-scope intents; exclude known controls and rematch each returned descriptor in fresh complete UI before its step |
 | Discovery payload/output | Compact redundant fields/protocol and use task-specific output caps; retain all candidate identities and checks |
 | Unchanged mapped scope | Reuse only after complete bidirectional identity/route/engine checks and a second unchanged observation |
 | Provider dispatch | Reserve shared physical calls, tokens and optional estimated USD before sending the complete capped request |
@@ -393,12 +407,12 @@ Copy the policy example into the target configuration and review these controls 
 | `agent.workflow.maxOutputTokens` | 4096 | Maximum allowance; adaptive requests normally send/reserve less |
 | `agent.workflow.compactRequests` | true | Omit redundant discovery metadata/empty fields; preserve identities, states, schemas and nonempty evidence |
 | `agent.workflow.adaptiveOutputLimits` | true | Task-specific output caps; disable for an evaluated model needing a larger reasoning/output allowance |
-| `agent.workflow.batchCaseTargets` | true | Group upcoming visible intents in one scope; requires reuse enabled |
+| `agent.workflow.batchCaseTargets` | true | Group upcoming unknown visible intents in one scope; requires `reuseReadOnlyResponses: true` |
 | `agent.workflow.maxTargetsPerBatch` | 8 | Bound candidate grouping; permitted range 2..16 |
 | `agent.workflow.maxProtocolRetries` | 1 | Zero or one primary repair of invalid read-only output |
 | `agent.workflow.maxEscalations` | 0 | Enable only with a separately evaluated, explicitly configured tier |
 | `agent.workflow.maxCostUsd` | 0 | Zero disables the monetary gate; a positive value requires both reviewed positive rates |
-| `agent.workflow.reuseReadOnlyResponses` | true | Fresh exact-target reuse plus bounded exact-evidence response reuse within the attempt |
+| `agent.workflow.reuseReadOnlyResponses` | true | Bounded exact-evidence response reuse and optional batching/map shortcuts; repository control reuse is always checked |
 
 The next-call token reservation is serialized UTF-8 input bytes plus 1,024 framing tokens and the actual task-specific output allowance. This conservative estimate is settled when valid provider usage arrives. Consequently, a request below the byte limit can still exceed the remaining token/cost allowance. `maxInputBytes` and `maxTokens` are independent guards, not interchangeable settings. The in-memory response cache holds at most 256 entries and ends with the workflow; a new run relies on saved recipes/maps rather than old provider judgments.
 
@@ -419,7 +433,7 @@ The paths above are placeholders. The optional launcher requires a Node runtime 
 | Metric | Interpretation |
 | --- | --- |
 | `providerCalls` | Physical attempts, including invalid-output repair and escalation; failures count too |
-| `reusedTargets` | Earlier learned targets accepted after fresh strict identity and permitted-role checks |
+| `reusedTargets` | Existing repository targets accepted across cases after fresh strict identity and permitted-role checks |
 | `reusedResponses` | Exact read-only requests satisfied by this instance's bounded in-memory cache |
 | `inputBytesSent`, `compactBytesSaved` | Serialized request bytes dispatched and bytes removed relative to the full discovery payload; not provider token counts |
 | `outputTokensReserved` | Sum of actual per-attempt output allowances; not actual generated tokens |
@@ -466,7 +480,7 @@ java -cp sf-e2e-cli/target/sf-e2e.jar scripts/MeasureFrameworkEfficiency.java 5
 node --test scripts/model-output-limit.test.mjs
 ```
 
-The benchmark uses local synthetic HTML and a zero-latency scripted provider; it makes no org login or paid AI call. One warmup is excluded, baseline/reuse order alternates, and each browser phase has a fresh context. It verifies the same supplied value, saves/reloads recipes, repairs a real label change, confirms disk persistence in strict restart, and rejects a wrong expected value. It measures masked PNG capture and the real bundled Allure renderer separately. Results and benchmark Allure are retained under a precise timestamp in `report`; the script prints both paths. This is an internal framework measurement, separate from the empty consumer test workspace.
+The benchmark uses local synthetic HTML and a zero-latency scripted provider; it makes no org login or paid AI call. One warmup is excluded, baseline/reuse order alternates, and each browser phase has a fresh context. It verifies the same supplied value, saves/reloads recipes, repairs a real label change, confirms disk persistence in strict restart, and rejects a wrong expected value. It measures masked PNG capture and the real bundled Allure renderer separately. Results and benchmark Allure are retained under a precise timestamp in `report`; the script prints both paths. This is an internal framework measurement, separate from the empty consumer test workspace. The current helper always checks repository controls: its response-cache off/on branches each identify the repeated field only once. Historical two-to-one call reductions below describe the earlier optional target-reuse policy.
 
 Earlier October 6, 2026 repeated local measurement before the locator snapshot optimization, Java 21/Windows/Chromium 1.63.0:
 
@@ -923,6 +937,7 @@ report/
     allure-generation.json
     allure-generation.log
     case-report.json           # file workflows; run-report.json for JUnit
+    test-design.html           # learning after a design was established, including failed attempts
     attempts/
   2026-10-06_09-12-05.007100000Z/
     ...
@@ -1000,7 +1015,7 @@ The framework is org-independent and configured per deployment. Browser automati
 
 No claim is made that every Salesforce edition, app, customization, authentication policy and UI combination has been tested. See [implementation](docs/IMPLEMENTATION.md) and [verification](docs/VERIFICATION.md) for the checks actually performed.
 
-The latest recorded full verification, on **October 8, 2026**, passed **342 internal checks in 59 suites**: 277 unit/component checks and 65 real-browser checks, with zero failures/errors/skips. A subsequent final CLI reproduction follow-up passed all 43 selected CLI checks, adding one new check for a combined current inventory of **343 distinct checks**; the full and scoped receipts are recorded separately in [VERIFICATION.md](docs/VERIFICATION.md). It covers change-impact selection, trends, AI budgets, component/release verdicts, POM/healing, recipe compatibility, JUnit lifecycle and Allure integrity. The reference audit additionally checks strict cache immutability, pre-dispatch ambiguity/completeness, uncertain action failures, bounded state-sensitive waits, transformed secrets, actual closed-root/inaccessible PII pixels and withheld changing coverage. The usability regressions check browser-free planning, offline case/value validation, protected artifacts and discovery frontier/stop reasons; reliability checks cover changing UI state, asynchronous selection, attempt deadlines and failed/repeated runtime cleanup. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** passed. This dated inventory is not a claim that checks were rerun for every later documentation edit; use [VERIFICATION.md](docs/VERIFICATION.md) and fresh command output for the actual scope. These are implementation receipts, not hosted CI or private-org/device certification.
+The latest recorded full verification, on **October 10, 2026**, passed **371 internal checks in 61 suites**: 305 unit/component checks and 66 browser checks, with zero failures/errors/skips. Subsequent CLI checks passed all 47 then-current CLI checks and 20 final publication/guide/browser checks, adding three regressions for **374 distinct checks** across the full and scoped runs. The [final review receipt](docs/VERIFICATION.md#october-10-final-code-review) records exact commands and corrected publication/report-integrity findings. Coverage includes ordered planning, cross-case/restart target reuse without duplicate definitions, independent wrong-result rejection, provider-free replay, recipe compatibility, owner-thread cleanup, masking, JUnit/dataset verdicts and Allure integrity. Chromium, Firefox and WebKit are exercised locally; Android/iOS protocol checks use a local W3C service. All **10 Node adapter/collector/budget checks** passed. These are local synthetic implementation checks, not hosted CI, private-org/device certification or paid-provider savings. Historical receipts remain in [VERIFICATION.md](docs/VERIFICATION.md); current command output establishes the scope of each later change.
 
 See the [requirement and best-practice audit](docs/REQUIREMENTS.md) for the implementation/evidence behind each requested capability.
 

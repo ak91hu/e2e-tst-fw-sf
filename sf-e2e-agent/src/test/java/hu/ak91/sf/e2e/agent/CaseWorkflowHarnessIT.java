@@ -23,14 +23,20 @@ class CaseWorkflowHarnessIT {
         try(var fixture=new Fixture()) {
             var config=fixture.config();var secrets=new SecretRegistry();var deadline=Deadline.after(Duration.ofSeconds(90));
             var store=new LocatorStore(root,"isolated","read-write");
-            CaseRecipe recipe;
+            CaseRecipe recipe;var learningEvents=new ArrayList<Map<String,Object>>();
             try(var engine=new PlaywrightEngine(config,secrets,deadline)) {
-                var learner=new CaseLearner(engine,store,fixture.model(secrets),config,secrets,e -> {});
+                var learner=new CaseLearner(engine,store,fixture.model(secrets),config,secrets,learningEvents::add);
                 var spec=learner.plan("provided-case","/start","Follow Continue, enter ${input}, submit, expect result ${expected}.",Set.of("input","expected"),deadline);
                 recipe=learner.learn(spec,"isolated",Map.of("input","PRIVATE_INPUT","expected","PRIVATE_INPUT"),deadline);
                 recipe.save(root.resolve("recipe.json"));
             }
             assertEquals("TST_provided-case",recipe.id());assertEquals(2,recipe.pageObjects().size());
+            assertEquals(List.of(1,1,1,1),learningEvents.stream().filter(e -> "case-instructions-interpreted".equals(e.get("kind"))).findFirst().orElseThrow().get("sourceSteps"));
+            assertTrue(learningEvents.indexOf(learningEvents.stream().filter(e -> "case-plan-ready".equals(e.get("kind"))).findFirst().orElseThrow())<
+                learningEvents.indexOf(learningEvents.stream().filter(e -> "case-step-started".equals(e.get("kind"))).findFirst().orElseThrow()));
+            var completed=learningEvents.stream().filter(e -> "case-step-learned".equals(e.get("kind"))).toList();
+            assertEquals(List.of(1,2,3,4),completed.stream().map(e -> e.get("step")).toList());
+            assertEquals(recipe.steps(),completed.stream().map(e -> e.get("implementation")).toList());
             assertNotEquals(recipe.steps().getFirst().page(),recipe.steps().get(1).page());
             assertEquals(recipe.steps().get(1).page(),recipe.steps().get(2).page());
             assertEquals(5,fixture.calls.get());fixture.provider.stop(0);fixture.label.set("Renamed field");
@@ -154,7 +160,9 @@ class CaseWorkflowHarnessIT {
                     var request=Json.MAPPER.readTree(content);String kind=request.path("kind").asString();Object data;
                     switch(kind) {
                         case "explore-cases" -> data=Map.of("cases",List.of(spec()));
-                        case "case-plan" -> data=Map.of("steps",spec().steps());
+                        case "case-plan" -> data=Map.of("steps",spec().steps().stream().map(step -> {
+                            var node=Json.MAPPER.valueToTree(step);((tools.jackson.databind.node.ObjectNode)node).put("sourceInstruction",1);return node;
+                        }).toList());
                         case "case-target" -> {
                             String target=request.path("params").path("target").asString();String role=switch(target) {case "Continue" -> "link";case "Input" -> "textbox";case "Submit" -> "button";default -> "status";};
                             var nodes=request.path("observation").path("nodes");String id=null;

@@ -4,6 +4,8 @@
 
 Assessed on October 6, 2026 against repository source, repeated local measurements and retained verification evidence. The framework is effective at eliminating model usage from repeated recipe execution and at reducing duplicate discovery work. Short-case wall time is dominated by context startup and reporting; large locator repositories have a measurable read-path cost. The evidence supports those specific conclusions, not universal Salesforce compatibility, production throughput or paid-model quality claims.
 
+Current learning always checks shared locator definitions and hashed instruction associations before identifying a target. The benchmark helper retains its historical metric names, but its response-cache off/on branches both avoid analyzing the same field twice. Earlier two-to-one receipts below remain dated evidence of the earlier optional within-attempt policy; see [current repository reuse](AI_WORKFLOW.md#smaller-requests-bounded-batches-and-unchanged-maps).
+
 ## Contents
 
 - [Method and reproducibility](#method-and-reproducibility)

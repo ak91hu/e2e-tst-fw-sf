@@ -13,6 +13,79 @@ class CaseCommandsTest {
     @TempDir Path root;
     private final StringWriter errors=new StringWriter();
     private int run(String... args) { var cli=SfE2eCli.commandLine();cli.setErr(new PrintWriter(errors));return cli.execute(args); }
+    private CaseRecipe verifiedRecipe() {
+        return new CaseRecipe(1,"TST_publication",Json.hash("fixture"),"fixture-engine","/app",
+            List.of(new CaseRecipe.Step("expectRoute",null,null,"/app",null,null)));
+    }
+    @Test void failedSessionCleanupCannotPublishAVerifiedRecipe() {
+        Path output=root.resolve("TST_cleanup.json");var phases=new ArrayList<String>();
+        var failure=new Failure("ENGINE_FAILURE","Synthetic cleanup failure");
+        AutoCloseable session=() -> {phases.add("close");throw failure;};
+        assertSame(failure,assertThrows(Failure.class,() -> {
+            var recipe=CaseCommands.verifiedAfterClose(session,() -> {phases.add("verify");return verifiedRecipe();});
+            CaseCommands.publishVerifiedOutput(output,recipe,Map.of(),false,() -> phases.add("report"));
+        }));
+        assertEquals(List.of("verify","close"),phases);assertFalse(Files.exists(output));
+    }
+    @Test void failedReportCannotPublishRecipeOrExtractedParameters() throws Exception {
+        Path output=root.resolve("TST_report.json");var failure=new Failure("REPORT_GENERATION_FAILED","Synthetic report failure");
+        var recipe=CaseCommands.verifiedAfterClose(() -> {},this::verifiedRecipe);
+        assertSame(failure,assertThrows(Failure.class,() -> CaseCommands.publishVerifiedOutput(output,recipe,Map.of("input","PRIVATE_INPUT"),true,() -> {throw failure;})));
+        assertFalse(Files.exists(output));assertFalse(Files.exists(root.resolve("TST_report.json.params.local.json")));
+    }
+    @Test void failedVerificationRetainsItsFailureWhenSessionCleanupAlsoFails() {
+        var primary=new Failure("ASSERTION_FAILED","Synthetic wrong expectation");var cleanup=new Failure("ENGINE_FAILURE","Synthetic cleanup failure");
+        AutoCloseable session=() -> {throw cleanup;};
+        var failure=assertThrows(Failure.class,() -> CaseCommands.verifiedAfterClose(session,() -> {throw primary;}));
+        assertSame(primary,failure);assertArrayEquals(new Throwable[]{cleanup},failure.getSuppressed());
+    }
+    @Test void successfulPublicationFollowsSessionCleanupAndReportFinalization() throws Exception {
+        Path output=root.resolve("TST_success.json");var phases=new ArrayList<String>();
+        var recipe=CaseCommands.verifiedAfterClose(() -> phases.add("close"),() -> {phases.add("verify");return verifiedRecipe();});
+        CaseCommands.publishVerifiedOutput(output,recipe,Map.of("input","PRIVATE_INPUT"),true,() -> {
+            phases.add("report");assertFalse(Files.exists(output));assertFalse(Files.exists(root.resolve("TST_success.json.params.local.json")));
+        });
+        assertEquals(List.of("verify","close","report"),phases);assertEquals(recipe,CaseRecipe.load(output));
+        assertEquals(Map.of("input","PRIVATE_INPUT"),Json.read(root.resolve("TST_success.json.params.local.json"),Map.class));
+    }
+    @Test void reportFailureRetainsThePrimaryWorkflowFailureWithoutOpeningABrowser() throws Exception {
+        String reference="E2E_REVIEW_MISSING_"+UUID.randomUUID().toString().replace("-","").toUpperCase(Locale.ROOT);
+        assertNull(System.getenv(reference));Path config=root.resolve("project.yaml");
+        Files.writeString(config,"schemaVersion: 1\nprojectId: final-review-fixture\nprofile: mapping\norg:\n  baseUrl: https://fixture.example\nauth:\n  mode: storage-state\npersonas:\n  default:\n    usernameRef: E2E_UNUSED_REVIEW_USER\n    storageStateRef: "+reference+"\nlocators:\n  dir: maps\n  mode: read-write\nreport:\n  root: reports\nretention:\n  journalDir: journals\n");
+        var policy=FrameworkConfig.load(config,Map.of());String previous=System.getProperty("sf.e2e.nodeExecutable");
+        Path output=root.resolve("TST_unpublished.json");
+        try {
+            System.setProperty("sf.e2e.nodeExecutable",root.resolve("missing-node").toString());
+            var failure=assertThrows(Failure.class,() -> CaseCommands.session(policy,new Persona("default"),"TST_fixture","/app",Map.of(),"learning",output,
+                (engine,store,model,namespace,deadline,secrets,events) -> {throw new AssertionError("Missing fixture credentials must prevent a browser/model session");}));
+            assertEquals("AUTH_CREDENTIAL_UNAVAILABLE",failure.code());assertFalse(Files.exists(output));
+            assertTrue(Arrays.stream(failure.getSuppressed()).anyMatch(error -> error instanceof Failure secondary && secondary.code().equals("REPORT_RUNTIME_UNAVAILABLE")));
+            try(var reports=Files.list(root.resolve("reports"))) {
+                var state=Json.read(reports.findFirst().orElseThrow().resolve("case-report.json"),Map.class);
+                assertEquals("FAILED",state.get("status"));assertEquals("AUTH_CREDENTIAL_UNAVAILABLE",state.get("code"));
+            }
+        } finally {if(previous==null) System.clearProperty("sf.e2e.nodeExecutable");else System.setProperty("sf.e2e.nodeExecutable",previous);}
+    }
+    @Test void concurrentPublicationCannotOverwriteAnotherVerifiedRecipe() throws Exception {
+        Path output=root.resolve("TST_shared.json");var barrier=new java.util.concurrent.CyclicBarrier(2);
+        var first=verifiedRecipe();var second=new CaseRecipe(1,"TST_other",first.namespaceHash(),first.engineVersion(),first.startRoute(),first.steps());
+        try(var workers=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var outcomes=new ArrayList<java.util.concurrent.Future<String>>();
+            for(var recipe:List.of(first,second)) outcomes.add(workers.submit(() -> {
+                try {
+                    CaseCommands.publishVerifiedOutput(output,recipe,Map.of(),false,() -> {
+                        try {barrier.await(5,java.util.concurrent.TimeUnit.SECONDS);}catch(Exception failure) {throw new AssertionError(failure);}
+                    });return "PUBLISHED";
+                } catch(Failure failure) {return failure.code();}
+            }));
+            var codes=List.of(outcomes.get(0).get(10,java.util.concurrent.TimeUnit.SECONDS),outcomes.get(1).get(10,java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals(1,codes.stream().filter("PUBLISHED"::equals).count());
+            assertTrue(codes.stream().allMatch(Set.of("PUBLISHED","CASE_OUTPUT_BUSY","CASE_RECIPE_EXISTS")::contains));
+            assertTrue(List.of(first,second).contains(CaseRecipe.load(output)));byte[] preserved=Files.readAllBytes(output);
+            assertEquals("CASE_RECIPE_EXISTS",assertThrows(Failure.class,() -> CaseCommands.publishVerifiedOutput(output,first,Map.of(),false,() -> fail("Existing output must reject publication before report work"))).code());
+            assertArrayEquals(preserved,Files.readAllBytes(output));
+        }
+    }
     @Test void offlineValidationNeedsNoConfigurationAndReportsIntentWithoutClaimingUiVerification() throws Exception {
         var spec=root.resolve("spec.json");var params=root.resolve("params.json");
         Json.write(spec,new CaseSpec("input","/app",List.of(new CaseSpec.Step("fill","Field",null,null,"input",null),new CaseSpec.Step("expectValue","Field",null,null,"expected",null))));

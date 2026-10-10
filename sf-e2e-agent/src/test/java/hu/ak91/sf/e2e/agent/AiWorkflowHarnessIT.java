@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Actual browser outcome proof: fewer calls must not weaken business assertions. */
 class AiWorkflowHarnessIT {
     @TempDir Path root;
-    @Test void reusedTargetHalvesLearningCallsAndFreshModelFreeReplayStillRejectsWrongExpectations() throws Exception {
+    @Test void repositoryReuseIsMandatoryWithEitherResponseCachePolicyAndReplayStillRejectsWrongExpectations() throws Exception {
         var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);server.createContext("/",exchange -> {
             byte[] html="<label>Reference<input data-testid='reference'></label>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type","text/html");exchange.sendResponseHeaders(200,html.length);exchange.getResponseBody().write(html);exchange.close();
@@ -33,7 +33,8 @@ class AiWorkflowHarnessIT {
                 var events=new ArrayList<Map<String,Object>>();var model=new AiWorkflowClient(agent,() -> provider,() -> {throw new AssertionError();},event -> events.add(Map.copyOf(event)));
                 var store=new LocatorStore(root.resolve(reuse?"optimized":"baseline"),"namespace","read-write");CaseRecipe recipe;
                 try(var engine=new PlaywrightEngine(config,new SecretRegistry(),deadline)) {recipe=new CaseLearner(engine,store,model,config,new SecretRegistry(),events::add).learn(spec,"namespace",params,deadline);}
-                assertEquals(reuse?1:2,provider.calls());assertEquals(reuse?1:0,events.stream().filter(e -> "ai-target-reused".equals(e.get("kind"))).count());
+                assertEquals(1,provider.calls());assertEquals(1,events.stream().filter(e -> "ai-target-reused".equals(e.get("kind"))).count());
+                assertEquals(recipe.steps().getFirst().key(),recipe.steps().getLast().key());assertEquals(1,store.entries().size());
                 if(reuse) {optimized=recipe;optimizedStore=store;}
             }
             var config=new FrameworkConfig(1,"ai-workflow-evaluation","checks",new FrameworkConfig.Org("local","auto",origin,List.of(),1,""),c.ui(),c.auth(),c.personas(),c.execution(),c.agent(),c.cache(),c.retention(),c.evidence(),c.report(),c.locators());

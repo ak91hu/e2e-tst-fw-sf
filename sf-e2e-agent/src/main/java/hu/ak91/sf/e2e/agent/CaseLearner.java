@@ -20,6 +20,7 @@ public final class CaseLearner {
     private final SecretRegistry secrets;
     private final Consumer<Map<String,Object>> events;
     private final Budget budget;
+    private final CaseTargetReuse targets;
     private final Map<String,Observation.Node> batchTargets=new HashMap<>();
     private String batchContext;
     private static final JsonNode BATCH_SCHEMA=Json.MAPPER.valueToTree(Map.of("type","object","required",List.of("targets"),"additionalProperties",false,
@@ -28,6 +29,7 @@ public final class CaseLearner {
     public CaseLearner(UiEngine engine,LocatorStore store,ModelClient model,FrameworkConfig config,SecretRegistry secrets,Consumer<Map<String,Object>> events) {
         this.engine=engine;this.store=store;this.model=model;this.config=config;this.secrets=secrets;this.events=events;
         budget=new Budget(config.agent().maxActions(),config.agent().maxModelCalls(),config.agent().maxTokens());
+        targets=new CaseTargetReuse(store,engine.capabilityVersion());
     }
     public record Plan(CaseSpec spec,Map<String,String> parameters) {}
     /** Reference-only convenience API; literals use planWithParameters so callers receive their values. */
@@ -39,6 +41,7 @@ public final class CaseLearner {
     /** Literal values must occur verbatim in supplied intent; shares the learning budget. */
     public Plan planWithParameters(String id,String route,String instructions,Set<String> parameterNames,Deadline deadline) {
         var result=new CasePlanner(model,secrets,budget).plan(id,route,instructions,parameterNames,deadline);
+        events.accept(Map.of("kind","case-instructions-interpreted","sourceSteps",result.sourceSteps(),"sourceInstructionCount",result.sourceInstructionCount()));
         return new Plan(result.spec(),result.parameters());
     }
     public CaseRecipe learn(CaseSpec spec,String namespace,Map<String,String> params,Deadline deadline) {
@@ -57,7 +60,7 @@ public final class CaseLearner {
         var runner=new CaseRunner(engine,store,config,deadline,events);
         List<CaseRecipe.Step> recorded=new ArrayList<>();
         Map<String,CaseRecipe.Step> learnedTargets=new HashMap<>();
-        // Each learning attempt has its own locator keys. A failed re-learning cannot corrupt an older recipe.
+        // Only genuinely new identities get attempt-isolated keys; existing recipe definitions stay unchanged.
         String modelRevision=UUID.randomUUID().toString();
         engine.open(spec.startRoute(),deadline);
         int index=0;
@@ -72,13 +75,15 @@ public final class CaseLearner {
                 step=new CaseRecipe.Step(intent.kind(),prior.page(),prior.key(),null,intent.valueRef(),intent.recordNameRef());
             }
             else {
-                var prior=learnedTargets.get(targetKey(intent));
-                if(config.agent().workflow().reuseReadOnlyResponses() && prior!=null && reuse(prior,intent,params,deadline)) {
-                    step=new CaseRecipe.Step(intent.kind(),prior.page(),prior.key(),null,intent.valueRef(),intent.recordNameRef());
-                    events.accept(Map.of("kind","ai-target-reused","page",prior.page(),"key",prior.key(),"action",intent.kind()));
-                } else {
                 var current=engine.observe(intent.container(),deadline);
-                Failure.require(current.complete(),"LOCATOR_INCOMPLETE","Incomplete UI cannot justify batch target reuse");
+                Failure.require(current.complete(),"LOCATOR_INCOMPLETE","Incomplete UI cannot justify target reuse");
+                var reusable=targets.find(intent,current,params);
+                if(reusable!=null) {
+                    var fresh=engine.observe(intent.container(),deadline);
+                    Failure.require(targets.stillMatches(reusable,intent,fresh,params),"MAPPING_UI_CHANGED","Reusable target changed during learning; no action was dispatched");
+                    step=new CaseRecipe.Step(intent.kind(),reusable.page(),reusable.key(),null,intent.valueRef(),intent.recordNameRef());
+                    events.accept(Map.of("kind","ai-target-reused","page",reusable.page(),"key",reusable.key(),"action",intent.kind(),"source","repository"));
+                } else {
                 Observation.Node node=consumeBatch(current,intent);
                 var observation=node==null?UiReadiness.stable(engine,intent.container(),deadline.child(Duration.ofSeconds(config.locators().timeoutSeconds()))):current;
                 var projected=project(observation,intent,params);
@@ -108,21 +113,23 @@ public final class CaseLearner {
                     for(String anchor:List.of("tag","frame")) if(node.attributes().containsKey(anchor)) attributes.put(anchor,node.attributes().get(anchor));
                     entry=new LocatorEntry(page,key,entry.route(),entry.engineVersion(),new SemanticTarget("link","${recordName}",null,intent.container()),attributes,List.of(),1,List.of());
                 } else Failure.require(intent.recordNameRef()==null,"CASE_INVALID","recordNameRef can only bind a recognized record link");
-                var old=store.entries().get(page+"/"+key);
-                if(old!=null) {
-                    var history=new ArrayList<>(old.history());history.add(new LocatorEntry.Change(java.time.Instant.now(),"case-relearn",old.primary(),entry.primary()));
-                    if(history.size()>50) history.removeFirst();
-                    entry=new LocatorEntry(page,key,entry.route(),entry.engineVersion(),entry.primary(),entry.attributes(),entry.alternatives(),old.revision()+1,history);
+                var existing=targets.existing(entry,intent,fresh,selected,params);
+                if(existing!=null) {
+                    entry=existing;
+                    events.accept(Map.of("kind","case-target-deduplicated","page",entry.page(),"key",entry.key(),"action",intent.kind()));
+                } else {
+                    store.putAll(List.of(entry));
                 }
-                store.putAll(List.of(entry));
-                step=new CaseRecipe.Step(intent.kind(),page,key,null,intent.valueRef(),intent.recordNameRef());
+                step=new CaseRecipe.Step(intent.kind(),entry.page(),entry.key(),null,intent.valueRef(),intent.recordNameRef());
                 }
             }
             if(charter!=null && CaseSpec.targeted(intent.kind())) charter.validateTarget(intent,store.get(step.page(),step.key()).primary(),params);
+            if(CaseSpec.targeted(intent.kind()) && !intent.kind().equals("expectHidden") && !(intent.kind().equals("expectCount") && "0".equals(params.get(intent.valueRef()))))
+                targets.remember(intent,store.get(step.page(),step.key()));
             if(!CaseSpec.assertion(step.kind())) budget.action();
             runner.execute(step,params);recorded.add(step);
             if(intent.instruction()!=null && !intent.kind().equals("expectHidden")) learnedTargets.put(targetKey(intent),step);
-            events.accept(Map.of("kind","case-step-learned","step",index,"action",step.kind(),"modelCalls",budget.calls()));
+            events.accept(Map.of("kind","case-step-learned","step",index,"action",step.kind(),"modelCalls",budget.calls(),"implementation",step));
         }
         return new CaseRecipe(1,spec.id(),Json.hash(namespace),engine.capabilityVersion(),spec.startRoute(),recorded);
     }
@@ -150,6 +157,7 @@ public final class CaseLearner {
         for(int i=position;i<Math.min(spec.steps().size(),position+workflow.maxTargetsPerBatch()*2);i++) {
             var step=spec.steps().get(i);
             if(!CaseSpec.targeted(step.kind()) || !Objects.equals(first.container(),step.container()) || step.recordNameRef()!=null || Set.of("expectHidden","expectCount").contains(step.kind())) break;
+            if(targets.find(step,observation,params)!=null) continue;
             String key=targetKey(step);if(!intents.containsKey(key) && intents.size()==workflow.maxTargetsPerBatch()) break;
             intents.putIfAbsent(key,step);kinds.computeIfAbsent(key,k -> new TreeSet<>()).add(step.kind());
         }
@@ -177,17 +185,6 @@ public final class CaseLearner {
         var selected=batchTargets.remove(targetKey(first));
         Failure.require(selected!=null,"CASE_LEARNING_BLOCKED","AI could not identify the current target in the supplied batch");
         return observation.nodes().stream().filter(n -> n.target().equals(selected.target()) && n.attributes().equals(selected.attributes())).findFirst().orElseThrow();
-    }
-    private boolean reuse(CaseRecipe.Step prior,CaseSpec.Step intent,Map<String,String> params,Deadline deadline) {
-        var p=config.locators();var exact=new FrameworkConfig.Locators(p.dir(),p.mode(),false,true,false,0,p.retryDelayMillis(),p.timeoutSeconds(),p.minConfidence(),p.minMargin());
-        try {
-            var node=new HealingLocators(engine,store,exact,deadline,e -> {}).read(prior.page(),prior.key(),
-                intent.recordNameRef()==null?Map.of():Map.of("recordName",params.get(intent.recordNameRef())),deadline);
-            return permittedRole(intent.kind(),node.target().role());
-        } catch(Failure failure) {
-            if(Set.of("LOCATOR_STALE","LOCATOR_WRONG_CONTEXT","TARGET_AMBIGUOUS","LOCATOR_LOW_CONFIDENCE","TARGET_NOT_FOUND").contains(failure.code())) return false;
-            throw failure;
-        }
     }
     private Observation project(Observation observed,CaseSpec.Step step,Map<String,String> params) {
         var nodes=observed.nodes().stream().filter(n -> permittedRole(step.kind(),n.target().role()) &&

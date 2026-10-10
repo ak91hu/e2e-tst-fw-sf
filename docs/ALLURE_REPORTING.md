@@ -22,6 +22,7 @@ Private traces/downloads/native screenshots have owner-only permissions, explici
 
 - Case/persona, execution mode, start/end times and actual verdict.
 - Ordered case steps, with incomplete future steps marked skipped.
+- An implemented HTML test design for learning attempts with established intent, including planned order, parameter references, completed locator references and unfinished steps; see [the design contract](CASE_WORKFLOWS.md#instruction-order-and-implemented-html-design).
 - Masked PNG attachments and a redacted event-log attachment.
 - Model-call count/events, locator retries and successful self-healing events.
 - AI workflow budgets, fresh-target/response reuse, escalations, charged tokens and reviewed-rate estimated cost; unpriced AI remains unknown in the quality summary. See [AI workflow](AI_WORKFLOW.md).
@@ -60,6 +61,7 @@ Names encode the actual start instant as `yyyy-MM-dd_HH-mm-ss.SSSSSSSSSZ` in UTC
 | `allure-generation.json` | Engine/version, generation timestamp and HTML checksum |
 | `allure-generation.log` | Output of the actual Allure renderer |
 | `case-report.json` or `run-report.json` | Structured execution data used for rebuilding |
+| `test-design.html` | Learning's interpreted design and implementation outcomes, also attached to Allure; absent before a plan is established |
 | `suite-report.json`, `cases/<dataset-id>/` | Aggregate dataset verdicts/checksums and isolated original row evidence |
 | `quality-summary.json`, per-attempt `browser-diagnostics.json` | Assertion, drift/retry, model-call event and browser-quality metrics |
 | `attempts/` | Original evidence, artifact manifests and redacted event journals |
@@ -73,7 +75,7 @@ java -jar sf-e2e-cli/target/sf-e2e.jar report build --run <run-directory>
 java -jar sf-e2e-cli/target/sf-e2e.jar report trends --run <run-directory> --window 100
 ```
 
-Verification checks evidence and the generated HTML checksum. Rebuilding consumes saved data and invokes Allure again without opening Salesforce or calling a model. Generation has a 120-second limit. If rendering fails, raw results remain available; the CLI returns a reporting/evidence failure (exit code 4). Inspect `allure-generation.log`, resolve the Java/cache/filesystem issue and rebuild.
+Verification checks evidence and the generated HTML checksum. When a `testDesign` receipt is present, it must be a valid object with the current attempt's attachment filename and SHA-256; both the standalone design and its Allure copy must match and remain inside the run directory. Malformed metadata or a foreign attachment fails verification even when the bytes match. Historical reports without this additive receipt remain readable. Rebuilding consumes saved data and invokes Allure again without opening Salesforce or calling a model. Generation has a 120-second limit. If rendering fails, raw results remain available; the CLI returns a reporting/evidence failure (exit code 4). Inspect `allure-generation.log`, resolve the Java/cache/filesystem issue and rebuild.
 
 After a successful render, both published HTML copies are verified before removing that render's owned `.allure-render-<UUID>` temporary directory. Cleanup checks the resolved parent and never follows symbolic links. Raw results, screenshots, existing report directories and failed-render diagnostics remain preserved. An I/O cleanup failure retains the temporary directory without invalidating the published report; historical temporary outputs are not swept automatically.
 

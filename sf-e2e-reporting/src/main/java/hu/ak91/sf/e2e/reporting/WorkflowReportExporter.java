@@ -13,12 +13,15 @@ public final class WorkflowReportExporter {
     }
     public static void write(Path root,Map<String,Object> state,List<Map<String,Object>> events,boolean render) {
         Map<String,Object> report=new LinkedHashMap<>(state);report.put("events",events);report.put("reportEngine","Allure");report.put("allureVersion",AllureReports.VERSION);
+        var design=TestDesignReport.write(root,state,events);
+        if(!design.isEmpty()) report.put("testDesign",design);
         Json.write(root.resolve("case-report.json"),report);
         String run=state.get("runId").toString(),attempt=state.get("attemptId").toString(),id=state.get("caseId").toString();
         var artifacts=Json.MAPPER.convertValue(state.getOrDefault("artifacts",List.of()),new TypeReference<List<EvidenceService.Artifact>>(){});
         var attachments=new ArrayList<>(AllureResults.attachments(root,run,attempt,artifacts));Path results=root.resolve("allure-results");
         String eventsFile=SafePaths.segment(attempt)+"-events.json";Json.write(results.resolve(eventsFile),events);
         attachments.add(Map.of("name","Redacted event log","type","application/json","source",eventsFile));
+        if(!design.isEmpty()) attachments.add(Map.of("name","Implemented test design","type","text/html","source",design.get("source")));
         attachments.add(QualityReports.attach(root,attempt,events));Json.write(root.resolve("quality-summary.json"),QualityReports.summarize(events));
         String verdict=state.get("status").toString(),diagnostic=Objects.toString(state.get("diagnostic"),"");
         if(verdict.equals("FAILED") && !Set.of("APPLICATION_DEFECT","QUALITY_GATE_FAILED","ASSERTION_FAILED","API_ASSERTION_FAILED","FILE_VERIFICATION_FAILED","UI_ASSERTION_FAILED","VALUE_MISMATCH").contains(Objects.toString(state.get("code"),""))) verdict="BLOCKED";
@@ -47,6 +50,10 @@ public final class WorkflowReportExporter {
     }
     public static void verifyEvidence(Path root) {
         var state=Json.read(root.resolve("case-report.json"),Map.class);
+        if(state.containsKey("testDesign")) {
+            Failure.require(state.get("testDesign") instanceof Map<?,?>,"REPORT_RUN_MISMATCH","Invalid test design receipt");
+            TestDesignReport.verify(root,Objects.toString(state.get("attemptId"),""),(Map<?,?>)state.get("testDesign"));
+        }
         Failure.require(((Number)state.getOrDefault("schemaVersion",0)).intValue()==1 && state.get("completedAt")!=null &&
             Set.of("PASSED","FAILED","CANCELLED","BLOCKED","SKIPPED").contains(Objects.toString(state.get("status"),"")),"REPORT_RUN_MISMATCH","Workflow report is incomplete");
         var artifacts=Json.MAPPER.convertValue(state.getOrDefault("artifacts",List.of()),new TypeReference<List<EvidenceService.Artifact>>(){});

@@ -10,6 +10,7 @@ The consumer workspace stays empty. Supply your own case as JSON or UTF-8 text, 
 - [Review a plan before executing](#review-a-plan-before-executing)
 - [A supplied structured case](#a-supplied-structured-case)
 - [A supplied text case](#a-supplied-text-case)
+- [Instruction order and implemented HTML design](#instruction-order-and-implemented-html-design)
 - [Autonomous UI discovery](#autonomous-ui-discovery)
 - [Interpret discovery scope and continue](#interpret-discovery-scope-and-continue)
 - [Resolve incomplete case input](#resolve-incomplete-case-input)
@@ -105,6 +106,25 @@ java -jar sf-e2e-cli/target/sf-e2e.jar learn-case --config project.local.yaml --
 
 AI translates the text into the supported step format, then resolves each target from the actual UI. Parameter names must refer to supplied values or validated verbatim literals. Missing/ambiguous targets, unsupported instructions or missing inputs stop learning. Use `--spec` when you want exact steps/scopes. Login is framework authentication, not a case step. The resulting recipe can be inspected as JSON; its page/key references can be inspected with `locators list` and `locators history`.
 
+## Instruction order and implemented HTML design
+
+For text designs, write one explicit instruction per nonblank line, in execution order, including intermediate assertions and the final expected result. Both `plan-case` and direct text learning send these ordered lines to the planner. Every generated step must identify its 1-based source instruction; several consecutive steps may implement one line. Missing, out-of-range or reordered references are rejected before case actions. An omitted line produces `CASE_INSTRUCTION_MISMATCH`; unsupported intent must remain blocked. There are at most 200 nonblank lines and 200 resulting steps. Blank lines are ignored. Multiline headings/context are also instruction lines, so include relevant context with its action or supply an exact structured `--spec`.
+
+This validates ordered line coverage, not natural-language semantic equivalence. A model can still misunderstand an action or claim an incorrect source reference. Review translated targets, scopes and independent assertions through `plan-case`; use `--spec` for caller-controlled exact operations. Keep multiple independent actions on separate lines so omissions inside a compound sentence are easier to detect. No model judge replaces the caller's expected outcome.
+
+The learner establishes its own `CaseSpec` before case actions, executes it in order and stops at the first unsuccessful step. After learning, the command prints **Implemented test design** with the run-owned `test-design.html` path. Allure also includes an **Implemented test design** HTML attachment. The standalone document contains:
+
+- Case ID, start route and final attempt status/code.
+- Every planned operation, target, scope and input/expected-result parameter reference, in order.
+- Source instruction numbers for direct text learning; structured learning retains the supplied step order.
+- Completed implementation page/key/route references, with `COMPLETED`, `STARTED — NOT COMPLETED` and `NOT EXECUTED` outcomes.
+
+The document is retained for failed learning after the plan is established, including later unexecuted steps. A started unfinished mutation can have an uncertain dispatched outcome; inspect the permanent journal before any explicit rerun. Completed steps cannot turn a failed evidence, quality or cleanup verdict into a passed attempt. Authentication/planning failures before `case-plan-ready` have no implemented design. Discovery, deterministic replay and Java consumer tests do not reconstruct absent authored intent into this document.
+
+The renderer consumes redacted events, escapes application text, uses no scripts or external resources and omits runtime parameter maps. Original free-text instructions/literal values are not copied into the HTML; references remain visible. Targets/labels may still contain consumer business data, so protect the report as other run evidence. `case-report.json` retains the HTML checksum, and `report verify` checks the standalone document and its Allure attachment copy. `report build` regenerates them from retained events without a model or target session. Existing reports without this additive receipt and existing spec/recipe schemas/checksums remain compatible. Custom text-planning model fixtures must return `sourceInstruction` in each model step; this metadata is removed before specification serialization.
+
+For usability, the recommended sequence is `plan-case`, review/edit the intent, `validate-case`, `learn-case --spec`, inspect the HTML design, then `replay-case` or `run-suite`. Learning produces an executable JSON recipe using Page Object Model; it does not generate Java test classes. Successful local framework fixtures do not establish compatibility with a consumer's target application.
+
 ## Autonomous UI discovery
 
 ```powershell
@@ -140,6 +160,7 @@ The presence recipe can pass even when the traversal stops early; this means its
 | Offline validation passes but learning reports an ambiguous target | Use a named dialog/form/region scope and a precise instruction; offline validation cannot inspect the UI |
 | `NEGATIVE_ASSERTION_UNPROVABLE` | First identify the same visible target with stable `testId`/`apiName`; an invented absent control cannot establish success |
 | `CASE_RECIPE_EXISTS` | Preserve the previous artifact and choose a new versioned specification/recipe output, accounting for the automatic `TST_` prefix and parameter sidecar |
+| `CASE_OUTPUT_BUSY` | Another publisher holds this recipe output; inspect the current journal/report and preserve the published artifact before any explicit rerun |
 | Replay rejects a plan or a different persona's recipe | Learn the reviewed specification for that target/persona, then replay the printed verified recipe path |
 
 Keep setup, uniqueness and cleanup requirements explicit in the consuming project. Discovery does not infer business expectations, create records or establish role coverage. No target org workflow or generated business case belongs in the framework distribution.
@@ -171,9 +192,11 @@ Recognized record links use `recordNameRef` pointing at a runtime parameter. Onl
 
 Recipes use schema version 1 and a SHA-256 integrity checksum. A namespace hash binds them to the configured project/org/persona/user/UI settings; engine capability changes require learning again. To use the same intent on another Salesforce installation, learn the same supplied specification against that installation. Source code and input format remain general; UI maps are deliberately deployment-specific runtime data.
 
-Learning attempts get separate locator page keys. Failed learning may leave diagnostic mappings but never publishes a runnable recipe or changes an older recipe's keys. The recipe is saved atomically only after all steps, deterministic assertions and required completion evidence succeed. Recipes/maps survive Maven clean and are ignored when kept under `.sf-e2e`.
+Every learning step first searches existing locator definitions and validated hashed instruction associations in the current namespace. Proven current controls retain their existing page/key without another target-identification call or locator write; paid batches exclude known targets. Unknown wording may require interpretation, followed by a second existing-definition check to avoid recording the same control twice. See [repository reuse and its limits](AI_WORKFLOW.md#smaller-requests-bounded-batches-and-unchanged-maps). New or changed identities get separate attempt-isolated locator page keys. Failed learning may leave diagnostic mappings but never publishes a runnable recipe or changes an older recipe's keys. CLI recipe publication follows successful steps, deterministic assertions, required completion evidence, browser/session cleanup and report finalization. A cleanup or report failure cannot publish the recipe or extracted-parameter sidecar; finalization failures update the permanent journal and retain failed report data without repeating application actions. Recipes/maps and their optional `.target-index.json` association sidecar survive Maven clean and are ignored when kept under `.sf-e2e`.
 
 `replay-case` permits only the deterministic profile. It shares `HealingLocators` with Java cases, including pre-dispatch retries, alternatives/fingerprints, confidence/ambiguity checks and revision/history updates. `--locator-mode read-write` persists confident repairs. CI/read-only mode keeps repairs in memory. `--strict-locators` rejects drift. There is no AI fallback, even if a model endpoint or credential exists in the environment. An uncertain dispatched action is not repeated automatically; the case fails for review.
+
+CLI publication uses an adjacent `<recipe filename>.publish.lock` to serialize same-output writers and rechecks existing recipe/parameter files while locked. An empty lock file can remain after release; file presence alone does not mean a publisher is active. A secondary journal/report failure retains the original workflow failure code and is added as suppressed diagnostics; it cannot justify repeating a dispatched action.
 
 Each command uses the same per-org local execution lock as the JUnit coordinator. A permanent `.sf-e2e-data/case-attempts/<attempt>.json` records status, model-call count, last step/event and evidence ownership before/after execution. `report/<UTC timestamp>/case-report.json`, redacted events and checksummed artifact manifests provide diagnostics. The folder preserves the run-start instant with nine fractional digits; exact timestamp collisions receive a unique suffix without reusing previous evidence. Relative report roots resolve against the config directory. Masked start/completion, completed-step and failure screenshots are enabled by default. The bundled Allure engine automatically generates a standalone `index.html`, with screenshots attached to their steps, actual verdicts, model calls and healing/retry events. `report build/verify` supports these file workflows and JUnit runs. See [Allure reporting](ALLURE_REPORTING.md). The generic attempt journal records execution; it does not infer created Salesforce object IDs or replace application-specific record registration.
 

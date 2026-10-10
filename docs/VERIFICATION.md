@@ -4,6 +4,7 @@
 
 ## Contents
 
+- [October 10 final code review](#october-10-final-code-review)
 - [October 8 audit capability follow-up](#october-8-audit-capability-follow-up)
 - [October 8 reference practice audit](#october-8-reference-practice-audit)
 - [October 8 case usability review](#october-8-case-usability-review)
@@ -13,6 +14,29 @@
 - [Completion audit](#completion-audit)
 - [What the evidence does and does not establish](#what-the-evidence-does-and-does-not-establish)
 - [Live org validation](#live-org-validation)
+
+## October 10 final code review
+
+The review covers the current ordered text planner, case learner, repository-first target reuse and hashed association index, CLI publication boundary, HTML design exporter, affected regressions and public usage documentation. Existing worktree changes were retained. Consumer Java tests remain empty; historical recipe/locator schemas and checksums and provider-free deterministic replay remain unchanged.
+
+Four findings were corrected:
+
+| Priority | Trigger and previous behavior | Result and regression |
+| --- | --- | --- |
+| P1 | CLI saved a recipe before browser cleanup and report finalization; a later failure could leave a runnable artifact from a failed attempt | Owned-session cleanup precedes report/evidence verification, which precedes recipe/parameter publication. Same-output publishers are serialized and existing files are checked again under the output lock. `CaseCommandsTest` covers cleanup/report failure, successful publication order and concurrent publication without overwrite |
+| P1 | A secondary journal/report exception during finalization could replace the original workflow failure | Keep the original exception/code and attach secondary finalization failures as suppressed diagnostics. Cleanup also preserves the original verification failure. `CaseCommandsTest` reproduces a missing-session failure plus unavailable Node before any browser/model session; `.tools/final-review-primary-failure-red.log` records the former incorrect `REPORT_RUNTIME_UNAVAILABLE` replacement |
+| P2 | A present `testDesign` value with a non-object type was ignored by report verification | Malformed metadata fails `REPORT_RUN_MISMATCH`; reports without the additive receipt remain compatible. `TestDesignReportTest.malformedDesignReceiptCannotBypassIntegrityVerification` |
+| P2 | An equally checksummed design attachment from a different attempt could satisfy the receipt | The receipt must reference the current attempt's exact attachment filename and valid SHA-256; publication/verification also enforce run-directory containment. `TestDesignReportTest.matchingForeignAttachmentCannotReplaceTheCurrentAttemptDesign` |
+
+Before correction, both new design-integrity regressions failed because verification accepted the faulty reports: `.tools/final-review-report-red.log`. After correction, all six design tests and eight report-integrity tests passed. A preliminary related run encountered `EVIDENCE_INCOMPLETE` while persisting a synthetic PNG in `AllureReportingTest`; the subsequent complete run passed all ten Allure tests and did not reproduce that I/O failure. Its cause was not established: `.tools/final-review-report-green.log` retains the preliminary failure.
+
+The full Windows reactor passed `mvnw.cmd -B -ntp verify -Pchecks` on Temurin 27+35 in **9 minutes 4 seconds: 371 checks in 61 suites, comprising 305 unit/component and 66 browser executions**, with zero failures/errors/skips. Receipt: `.tools/final-code-review-acceptance.log`. The Node adapter/collector/budget checks passed all ten executions: `node --test scripts/model-output-limit.test.mjs scripts/component-adapter.test.mjs scripts/collect-changes.test.mjs`, receipt `.tools/final-code-review-node.log`. Ignored receipts are optional local evidence, not fresh-checkout prerequisites.
+
+The final CLI evidence-verification gate and additional primary-failure/cleanup regression were verified afterward with `mvnw.cmd -B -ntp -pl sf-e2e-cli -am verify -Pchecks "-Dtest=hu.ak91.sf.e2e.cli.*Test" "-Dsurefire.failIfNoSpecifiedTests=false" "-Dit.test=ExplorationCommandsHarnessIT" "-Dfailsafe.failIfNoSpecifiedTests=false"`: **47 checks, comprising all 46 CLI unit/component and one browser execution**, zero failures/errors/skips. Receipt: `.tools/final-code-review-cli-followup.log`.
+
+The last primary-failure and concurrent-publication guards passed `mvnw.cmd -B -ntp -pl sf-e2e-cli -am verify -Pchecks "-Dtest=CaseCommandsTest,GuideCommandTest" "-Dsurefire.failIfNoSpecifiedTests=false" "-Dit.test=ExplorationCommandsHarnessIT" "-Dfailsafe.failIfNoSpecifiedTests=false"`: **20 checks, comprising all 17 case-command tests, two guide tests and one browser execution**, zero failures/errors/skips. Receipt: `.tools/final-review-publication-guards.log`. The combined current inventory is **374 distinct checks in 61 suites: 308 unit/component and 66 browser**. Repeated executions are not added twice; this is full-reactor plus scoped follow-up evidence, not a separate 374-check full run. Final Markdown-only receipt/README updates are validated and repackaged separately.
+
+README usage now explains ordered source-line coverage, editable plan review, mandatory cross-case/restart control reuse, the auxiliary association file, final HTML handoff and the limits of cost reduction. Line coverage does not establish semantic equivalence; callers review the interpreted actions and supply unchanged independent expectations. Local synthetic browser/model/HTTP/W3C checks do not establish private-org compatibility, hosted CI, real-device certification, paid billing savings or production throughput.
 
 ## October 8 audit capability follow-up
 

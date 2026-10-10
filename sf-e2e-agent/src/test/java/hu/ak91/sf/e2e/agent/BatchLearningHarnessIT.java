@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class BatchLearningHarnessIT {
     @TempDir Path root;
     static class Fixture implements AutoCloseable {
-        final HttpServer server;int calls;long bytes;boolean drift,invalid;List<Integer> caps=new ArrayList<>(),wireSizes=new ArrayList<>();
+        final HttpServer server;int calls;long bytes;boolean drift,invalid;List<Integer> caps=new ArrayList<>(),wireSizes=new ArrayList<>();List<String> requestedTargets=new ArrayList<>();
         Fixture() throws Exception {
             server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
             server.createContext("/",e -> {
@@ -32,9 +32,12 @@ class BatchLearningHarnessIT {
                 assertFalse(Json.string(request).contains("PRIVATE_INPUT_SENTINEL"));Object data;
                 if(request.path("kind").asString().equals("case-target-batch")) {
                     List<Map<String,Object>> selected=new ArrayList<>();
-                    for(var target:request.path("params").path("targets")) selected.add(Map.of("id",target.path("id").asString(),"nodeId",invalid?"invented":node(request,target.path("instruction").asString())));
+                    for(var target:request.path("params").path("targets")) {
+                        requestedTargets.add(target.path("instruction").asString());
+                        selected.add(Map.of("id",target.path("id").asString(),"nodeId",invalid?"invented":node(request,target.path("instruction").asString())));
+                    }
                     data=Map.of("targets",selected);
-                } else data=Map.of("nodeId",node(request,request.path("params").path("target").asString()));
+                } else {requestedTargets.add(request.path("params").path("target").asString());data=Map.of("nodeId",node(request,request.path("params").path("target").asString()));}
                 var response=new ModelClient.Response("finish",null,null,null,"PASSED","Observed fixture targets",null,List.of(),Json.MAPPER.valueToTree(data),null);
                 long input=(wire.length+3)/4;long output=32;
                 send(e,"application/json",Json.string(Map.of("choices",List.of(Map.of("finish_reason","stop","message",Map.of("content",Json.string(response)))),"usage",Map.of("total_tokens",input+output,"prompt_tokens",input,"completion_tokens",output))));
@@ -42,6 +45,7 @@ class BatchLearningHarnessIT {
         }
         String origin() {return "http://127.0.0.1:"+server.getAddress().getPort();}
         String node(tools.jackson.databind.JsonNode request,String name) {
+            if(name.startsWith("The field labelled ")) name=name.substring("The field labelled ".length());
             for(var node:request.path("observation").path("nodes")) if(node.path("attributes").path("testId").asString().equals(name.toLowerCase(Locale.ROOT))) return node.path("id").asString();
             throw new AssertionError("Requested fixture target is absent");
         }
@@ -60,6 +64,37 @@ class BatchLearningHarnessIT {
         return new FrameworkConfig(1,"cost-harness","checks",new FrameworkConfig.Org("local","auto",fixture.origin(),List.of(),1,""),d.ui(),d.auth(),d.personas(),new FrameworkConfig.Execution(1,0,120,10,1,false),agent,d.cache(),d.retention(),d.evidence(),d.report(),d.locators());
     }
     Deadline deadline() {return Deadline.after(Duration.ofSeconds(90));}
+    @Test void successiveCasesAnalyzeOnlyNewTargetsAndRestartedLearningNeedsNoProvider() throws Exception {
+        try(var fixture=new Fixture()) {
+            var config=config(fixture,true);var store=new LocatorStore(root.resolve("shared"),"benchmark","read-write");var secrets=new SecretRegistry();
+            var transport=new JsonModelClient(config.agent(),secrets,HttpClient.newHttpClient(),"LOCAL_ONLY");
+            var first=new CaseSpec("first","/app",List.of(new CaseSpec.Step("fill","The field labelled Alpha",null,null,"input",null),new CaseSpec.Step("expectValue","The field labelled Alpha",null,null,"expected",null)));
+            try(var engine=new PlaywrightEngine(config,secrets,deadline())) {
+                new CaseLearner(engine,store,new AiWorkflowClient(config.agent(),() -> transport,() -> transport,e -> {}),config,secrets,e -> {}).learn(first,"benchmark",Map.of("input","PRIVATE_INPUT_SENTINEL","expected","PRIVATE_INPUT_SENTINEL"),deadline());
+            }
+            assertEquals(1,fixture.calls);assertEquals(1,store.entries().size());var original=Map.copyOf(store.entries());fixture.calls=0;fixture.requestedTargets.clear();
+            var second=new CaseSpec("second","/app",List.of(new CaseSpec.Step("fill","Beta",null,null,"input",null),new CaseSpec.Step("fill","The field labelled Alpha",null,null,"input",null),new CaseSpec.Step("fill","Gamma",null,null,"input",null),new CaseSpec.Step("expectValue","Gamma",null,null,"expected",null)));
+            try(var engine=new PlaywrightEngine(config,secrets,deadline())) {
+                new CaseLearner(engine,new LocatorStore(root.resolve("shared"),"benchmark","read-write"),new AiWorkflowClient(config.agent(),() -> transport,() -> transport,e -> {}),config,secrets,e -> {}).learn(second,"benchmark",Map.of("input","PRIVATE_INPUT_SENTINEL","expected","PRIVATE_INPUT_SENTINEL"),deadline());
+            }
+            assertEquals(1,fixture.calls);assertEquals(List.of("Beta","Gamma"),fixture.requestedTargets,"Known Alpha must not be included in the paid batch");assertEquals(3,store.entries().size());
+            original.forEach((key,entry) -> assertEquals(entry,store.entries().get(key)));byte[] saved=Files.readAllBytes(store.path());fixture.calls=0;fixture.requestedTargets.clear();CaseRecipe recipe;
+            var unavailable=new ScriptedModelClient(request -> {throw new AssertionError("Existing controls must not contact a provider");});
+            try(var engine=new PlaywrightEngine(config,new SecretRegistry(),deadline())) {
+                recipe=new CaseLearner(engine,new LocatorStore(root.resolve("shared"),"benchmark","read-write"),unavailable,config,new SecretRegistry(),e -> {}).learn(spec(),"benchmark",Map.of("input","new-input","expected","new-input"),deadline());
+            }
+            assertEquals(0,unavailable.calls());assertEquals(0,fixture.calls);assertArrayEquals(saved,Files.readAllBytes(store.path()));
+            recipe.save(root.resolve("shared.recipe.json"));
+            try(var engine=new PlaywrightEngine(config,new SecretRegistry(),deadline())) {new CaseRunner(engine,store,config,deadline(),e -> {}).run(CaseRecipe.load(root.resolve("shared.recipe.json")),"benchmark",store,Map.of("input","replay-value","expected","replay-value"));}
+            var execution=new FrameworkConfig.Execution(1,0,90,1,1,false);
+            var shortConfig=new FrameworkConfig(1,config.projectId(),config.profile(),config.org(),config.ui(),config.auth(),config.personas(),execution,config.agent(),config.cache(),config.retention(),config.evidence(),config.report(),config.locators());
+            var events=new ArrayList<Map<String,Object>>();
+            try(var engine=new PlaywrightEngine(shortConfig,new SecretRegistry(),deadline())) {
+                assertEquals("ASSERTION_FAILED",assertThrows(Failure.class,() -> new CaseLearner(engine,store,unavailable,shortConfig,new SecretRegistry(),events::add).learn(spec(),"benchmark",Map.of("input","actual","expected","wrong"),deadline())).code());
+            }
+            assertEquals(3,events.stream().filter(e -> "locator-action".equals(e.get("kind"))).count());assertEquals(0,unavailable.calls());assertEquals(0,fixture.calls);assertArrayEquals(saved,Files.readAllBytes(store.path()));
+        }
+    }
     @Test void threeTargetsNeedOneHttpCallWithSmallerWireAndFreshReplayStillRejectsWrongResult() throws Exception {
         try(var fixture=new Fixture()) {
             long baselineBytes=0;BigDecimal baselineCost=null;CaseRecipe recipe=null;LocatorStore store=null;

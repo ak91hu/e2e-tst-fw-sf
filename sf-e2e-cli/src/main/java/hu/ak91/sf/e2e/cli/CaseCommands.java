@@ -150,6 +150,28 @@ public final class CaseCommands {
     @FunctionalInterface interface Work {
         CaseRecipe execute(PlaywrightEngine engine,LocatorStore store,ModelClient model,String namespace,Deadline deadline,SecretRegistry secrets,Consumer<Map<String,Object>> events);
     }
+    /** A verified value cannot escape while its owned session still needs successful cleanup. */
+    static CaseRecipe verifiedAfterClose(AutoCloseable session,Callable<CaseRecipe> verification) throws Exception {
+        try(session) { return verification.call(); }
+    }
+    /** Publication requires successful report finalization and never repeats application actions. */
+    static void publishVerifiedOutput(Path output,CaseRecipe recipe,Map<String,String> params,boolean generated,Runnable report) {
+        requireNewOutput(output);
+        Path values=generated?parameterOutput(output):null;
+        if(values!=null) requireNewOutput(values);
+        report.run();
+        try {
+            Path absolute=output.toAbsolutePath();Files.createDirectories(absolute.getParent());
+            try(var channel=FileChannel.open(absolute.resolveSibling(absolute.getFileName()+".publish.lock"),StandardOpenOption.CREATE,StandardOpenOption.WRITE);
+                var lock=channel.tryLock()) {
+                Failure.require(lock!=null,"CASE_OUTPUT_BUSY","Another process is publishing this recipe output");
+                requireNewOutput(output);if(values!=null) requireNewOutput(values);
+                if(values!=null) Json.write(values,params);
+                recipe.save(output);
+            }
+        } catch(OverlappingFileLockException busy) { throw new Failure("CASE_OUTPUT_BUSY","Another process is publishing this recipe output"); }
+        catch(java.io.IOException failure) { throw new Failure("JOURNAL_WRITE_FAILED","Cannot lock or publish verified recipe output"); }
+    }
     static int session(FrameworkConfig config,Persona persona,String id,String startRoute,Map<String,String> params,String mode,Path output,Work work) {
         return session(config,persona,id,startRoute,params,mode,output,work,null,null);
     }
@@ -182,53 +204,75 @@ public final class CaseCommands {
             state.put("lastEvent",secrets.redactTree(Json.MAPPER.valueToTree(event)));Json.write(journal,state);
         };
         Json.write(journal,state);
+        CaseRecipe verifiedRecipe=null;
+        RuntimeException primaryFailure=null;
         try {
             var auth=new JwtAuthenticator(config,secrets);auth.preflight(Set.of(persona));
             String identity=config.auth().mode().equals("jwt")?secrets.resolve(new SecretRef(config.persona(persona).usernameRef(),"persona-username")).toLowerCase(Locale.ROOT):BrowserState.path(config,persona).toRealPath().toString();
             try(var lock=ExecutionLocks.shared(config.org().baseUrl(),identity)) {
                 ModelClient model=learning?AiWorkflowClient.create(config.agent(),secrets,events):null;
                 String namespace=LocatorStore.namespace(config,persona);var store=new LocatorStore(Path.of(config.locators().dir()),namespace,config.locators().mode());
-                try(var engine=new PlaywrightEngine(config,secrets,deadline,persona)) {
-                    engine.operationEvents(events);
-                    if(!config.ui().fileInputRoot().isBlank()) engine.configureFiles(Path.of(config.ui().fileInputRoot()),evidence.attemptRoot().resolve("private-downloads"),evidence::event);
-                    active[0]=engine;
-                    try {
-                        engine.bootstrap(auth.frontdoor(persona,deadline),deadline);engine.startQualityMonitoring();engine.open(startRoute,deadline);
-                        if(config.evidence().privateTraceOnFailure()) engine.startPrivateTrace(evidence.attemptRoot().resolve("private-trace"),attemptId);
-                        UiReadiness.stable(engine,"page",deadline.child(Duration.ofSeconds(config.locators().timeoutSeconds())));evidence.checkpoint("case-start");
-                        var recipe=work.execute(engine,store,model,namespace,deadline,secrets,events);
-                        evidence.checkpoint("test-completion");evidence.verifyMinimum(config.evidence().minPngPerPassedResult());
-                        BrowserQuality.verify(config.quality(),engine.browserIssues(),evidence.events(),events);
-                        if(output!=null) {
-                            requireNewOutput(output);
-                            if(Boolean.TRUE.equals(state.get("generatedParameters"))) {
-                                var valuesFile=parameterOutput(output);requireNewOutput(valuesFile);Json.write(valuesFile,params);
-                                state.put("parameterFile",valuesFile.toAbsolutePath().toString());
+                var engine=new PlaywrightEngine(config,secrets,deadline,persona);
+                try {
+                    verifiedRecipe=verifiedAfterClose(engine,() -> {
+                        engine.operationEvents(events);
+                        if(!config.ui().fileInputRoot().isBlank()) engine.configureFiles(Path.of(config.ui().fileInputRoot()),evidence.attemptRoot().resolve("private-downloads"),evidence::event);
+                        active[0]=engine;
+                        try {
+                            engine.bootstrap(auth.frontdoor(persona,deadline),deadline);engine.startQualityMonitoring();engine.open(startRoute,deadline);
+                            if(config.evidence().privateTraceOnFailure()) engine.startPrivateTrace(evidence.attemptRoot().resolve("private-trace"),attemptId);
+                            UiReadiness.stable(engine,"page",deadline.child(Duration.ofSeconds(config.locators().timeoutSeconds())));evidence.checkpoint("case-start");
+                            var recipe=work.execute(engine,store,model,namespace,deadline,secrets,events);
+                            evidence.checkpoint("test-completion");evidence.verifyMinimum(config.evidence().minPngPerPassedResult());
+                            BrowserQuality.verify(config.quality(),engine.browserIssues(),evidence.events(),events);
+                            return recipe;
+                        } catch(RuntimeException failure) {
+                            try { engine.finishPrivateTrace(true); } catch(RuntimeException traceFailure) { failure.addSuppressed(traceFailure); }
+                            if(!Set.of("APPLICATION_DEFECT","QUALITY_GATE_FAILED").contains(failure instanceof Failure f?f.code():""))
+                                try { BrowserQuality.verify(config.quality(),engine.browserIssues(),evidence.events(),events); } catch(RuntimeException secondary) { failure.addSuppressed(secondary); }
+                            try { evidence.checkpoint("case-failure"); } catch(RuntimeException withheld) {
+                                failure.addSuppressed(withheld);evidence.event(Map.of("kind","failure-capture-unavailable","code",withheld instanceof Failure f?f.code():"ENGINE_FAILURE"));
                             }
-                            recipe.save(output);state.put("recipe",output.toAbsolutePath().toString());
+                            throw failure;
                         }
-                        state.put("recipeChecksum",Json.hash(recipe));state.put("pageObjects",recipe.pageObjects());state.put("steps",recipe.steps().size());state.put("status","PASSED");
-                    } catch(RuntimeException failure) {
-                        try { engine.finishPrivateTrace(true); } catch(RuntimeException traceFailure) { failure.addSuppressed(traceFailure); }
-                        if(!Set.of("APPLICATION_DEFECT","QUALITY_GATE_FAILED").contains(failure instanceof Failure f?f.code():""))
-                            try { BrowserQuality.verify(config.quality(),engine.browserIssues(),evidence.events(),events); } catch(RuntimeException secondary) { failure.addSuppressed(secondary); }
-                        try { evidence.checkpoint("case-failure"); } catch(RuntimeException withheld) {
-                            failure.addSuppressed(withheld);evidence.event(Map.of("kind","failure-capture-unavailable","code",withheld instanceof Failure f?f.code():"ENGINE_FAILURE"));
-                        }
-                        throw failure;
-                    }
+                    });
                 } finally { active[0]=null; }
+            }
+            state.put("recipeChecksum",Json.hash(verifiedRecipe));state.put("pageObjects",verifiedRecipe.pageObjects());state.put("steps",verifiedRecipe.steps().size());state.put("status","PASSED");
+            if(output!=null) {
+                state.put("recipe",output.toAbsolutePath().toString());
+                if(Boolean.TRUE.equals(state.get("generatedParameters"))) state.put("parameterFile",parameterOutput(output).toAbsolutePath().toString());
             }
         } catch(Exception failure) {
             String code=failure instanceof Failure f?f.code():failure instanceof OverlappingFileLockException?"ENVIRONMENT_UNAVAILABLE":"ENGINE_FAILURE";
             state.put("status","FAILED");state.put("code",code);state.put("diagnostic",secrets.redact(Objects.toString(failure.getMessage(),failure.getClass().getSimpleName())));
-            if(failure instanceof Failure f) throw f;
-            throw new Failure(code,"Case workflow failed; inspect the permanent attempt journal and report");
+            primaryFailure=failure instanceof Failure f?f:new Failure(code,"Case workflow failed; inspect the permanent attempt journal and report");
+            throw primaryFailure;
         } finally {
-            state.put("completedAt",Instant.now());state.put("artifacts",evidence.artifacts());state.put("trendParametersHash",Json.hash(params));
-            Json.write(journal,state);WorkflowReportExporter.write(reportRoot,state,evidence.events(),reservedRoot==null);
-            if(reservedRoot==null) System.out.println("Allure report: "+reportRoot.resolve("index.html"));
+            try {
+                state.put("completedAt",Instant.now());state.put("artifacts",evidence.artifacts());state.put("trendParametersHash",Json.hash(params));
+                Json.write(journal,state);
+                Runnable report=() -> {
+                    WorkflowReportExporter.write(reportRoot,state,evidence.events(),reservedRoot==null);
+                    WorkflowReportExporter.verifyEvidence(reportRoot);
+                };
+                if(output!=null && "PASSED".equals(state.get("status")))
+                    publishVerifiedOutput(output,verifiedRecipe,params,Boolean.TRUE.equals(state.get("generatedParameters")),report);
+                else report.run();
+            } catch(RuntimeException finalizationFailure) {
+                if("PASSED".equals(state.get("status"))) {
+                    state.put("status","FAILED");state.put("code",finalizationFailure instanceof Failure f?f.code():"REPORT_GENERATION_FAILED");
+                    state.put("diagnostic",secrets.redact(Objects.toString(finalizationFailure.getMessage(),"Workflow finalization failed")));
+                    state.remove("recipe");state.remove("parameterFile");
+                    try { Json.write(journal,state);WorkflowReportExporter.write(reportRoot,state,evidence.events(),reservedRoot==null); }
+                    catch(RuntimeException secondary) { finalizationFailure.addSuppressed(secondary); }
+                }
+                if(primaryFailure!=null) primaryFailure.addSuppressed(finalizationFailure);
+                else throw finalizationFailure;
+            }
+            if(reservedRoot==null && Files.isRegularFile(reportRoot.resolve("index.html"))) System.out.println("Allure report: "+reportRoot.resolve("index.html"));
             System.out.println("Case data: "+reportRoot.resolve("case-report.json"));System.out.println("Permanent attempt journal: "+journal);
+            if(Files.isRegularFile(reportRoot.resolve("test-design.html"))) System.out.println("Implemented test design: "+reportRoot.resolve("test-design.html"));
         }
         if(output!=null) System.out.println("Verified recipe: "+output.toAbsolutePath());
         if(state.containsKey("parameterFile")) System.out.println("Private runtime parameters: "+state.get("parameterFile"));

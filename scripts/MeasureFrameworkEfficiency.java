@@ -75,6 +75,7 @@ public class MeasureFrameworkEfficiency {
             Map<String,Object> statistics=new LinkedHashMap<>();measurements.forEach((key,data) -> statistics.put(key,stats(data)));result.put("timingsMs",statistics);
             result.put("learningSamples",rows);result.put("wrongExpectationRejected",true);result.put("freshReplayProviderCalls",0);result.put("healingAndRestartProviderCalls",0);
             result.put("aiCostComparison",costRows);
+            result.put("repositoryTargetReuseAlwaysEnabled",true);
             result.put("illustrativeRates",Map.of("inputUsdPerMillionTokens",1,"outputUsdPerMillionTokens",10,"providerUsageIsSynthetic",true));
             result.put("allureHtml",rendered.toString());result.put("shadedCliBytes",Files.size(Path.of("sf-e2e-cli/target/sf-e2e.jar")));
             Json.write(root.resolve("efficiency.json"),result);
@@ -97,7 +98,7 @@ public class MeasureFrameworkEfficiency {
             recipe=new CaseLearner(engine,store,model,config,new SecretRegistry(),events::add).learn(spec,"benchmark",values,deadline());
             if(measured) add(reuse?"learnReuseCore":"learnBaselineCore",elapsed(operation));
         }
-        require(provider.calls()==(reuse?1:2),"Learning call count differs from the measured contract");
+        require(provider.calls()==1,"Mandatory repository lookup must avoid a second field analysis with either response-cache setting");
         require(events.stream().filter(e -> "assertion-passed".equals(e.get("kind"))).count()==1,"Learning did not verify the expected value");
         if(measured) add(reuse?"learnReuseTotal":"learnBaselineTotal",elapsed(total));
         Path path=root.resolve("recipes/"+id+".json");recipe.save(path);return new Learned(CaseRecipe.load(path),store,model.snapshot());
