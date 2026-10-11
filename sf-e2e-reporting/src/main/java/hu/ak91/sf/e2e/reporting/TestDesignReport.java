@@ -35,7 +35,7 @@ final class TestDesignReport {
             </head><body><h1>Implemented test design</h1>
             """);
         html.append("<p>Case: <strong>").append(escape(maintenance==null?plan.path("id").asString():Objects.toString(state.get("caseId"),plan.path("id").asString()))).append("</strong><br>Start route: <code>")
-            .append(escape(plan.path("startRoute").asString())).append("</code><br>Final attempt status: <strong>")
+            .append(escape(plan.path("startRoute").asString())).append("</code><br>Attempt status: <strong>")
             .append(escape(Objects.toString(state.get("status"),"UNKNOWN"))).append("</strong> ")
             .append(escape(Objects.toString(state.get("code"),""))).append("</p>");
         html.append("<p>This design was established before case actions. Steps retain their planned order. Expected results remain caller-owned parameter references; runtime values are omitted. A completed step does not override a failed final evidence, quality or cleanup verdict.</p>");

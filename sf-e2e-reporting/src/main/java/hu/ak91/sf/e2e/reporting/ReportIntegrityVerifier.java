@@ -7,6 +7,7 @@ import java.util.*;
 public final class ReportIntegrityVerifier {
     private ReportIntegrityVerifier() {}
     public static void verify(Path root,RunReport report,int minimumPng) {
+        PreflightReport.verify(root);HtmlSummary.verify(root);
         Failure.require(report.schemaVersion()==1 && report.complete() && report.completedAt()!=null &&
             report.selection().size()==report.results().size(),"REPORT_RUN_MISMATCH","Run is incomplete or result count differs from selection");
         Set<String> selected=new HashSet<>(),seen=new HashSet<>();

@@ -9,6 +9,8 @@ import hu.ak91.sf.e2e.salesforce.auth.JwtAuthenticator;
 import hu.ak91.sf.e2e.reporting.EvidenceService;
 import hu.ak91.sf.e2e.reporting.WorkflowReportExporter;
 import hu.ak91.sf.e2e.reporting.ReportDirectories;
+import hu.ak91.sf.e2e.reporting.PreflightReport;
+import hu.ak91.sf.e2e.reporting.HtmlSummary;
 import hu.ak91.sf.e2e.core.quality.BrowserQuality;
 import picocli.CommandLine.*;
 import java.nio.file.*;
@@ -89,32 +91,38 @@ public final class CaseCommands {
         @Option(names="--route",description="Application-relative start route for text input.") String route;
         @Option(names="--output",required=true,description="New recipe JSON file; its filename gets TST_ when absent. Existing recipes are preserved.") Path output;
         public Integer call() {
-            var config=input.options.config("mapping");requireMapping(config);output=preparedOutput(output);
-            Failure.require(charterFile==null || spec!=null,"CASE_INVALID","Charter learning requires a reviewed specification");
-            if(charterFile!=null) charter=Json.MAPPER.treeToValue(readJson(charterFile),ExplorationCharter.class);
-            Failure.require((spec!=null) != (instructions!=null),"CASE_INVALID","Supply exactly one of --spec or --instructions");
-            var params=new TreeMap<>(input.parameters());CaseSpec supplied=null;String text=null;
-            if(spec!=null) {
-                Failure.require(id==null && route==null,"CASE_INVALID","--id/--route are supplied by --spec");
-                supplied=readSpec(spec);
-                validateSpecParams(supplied,params);id=supplied.id();route=supplied.startRoute();
-                if(charter!=null) charter.validate(supplied,params.keySet());
-            } else {
-                requireNewOutput(parameterOutput(output));
-                Failure.require(id!=null && route!=null,"CASE_INVALID","Text input requires --id and --route");id=CaseNames.generated(id);
-                FrameworkConfig.validateRoute(route);text=readText(instructions,40000);
-                Failure.require(!text.isBlank(),"CASE_INVALID","Test instructions are empty");
-            }
-            final CaseSpec prepared=supplied;final String content=text;
-            return session(config,input.persona,id,route,params,"learning",output,(engine,store,model,namespace,deadline,secrets,events) -> {
-                var learner=new CaseLearner(engine,store,model,config,secrets,events);
-                CaseSpec plan=prepared;
-                if(plan==null) {
-                    var translated=learner.planWithParameters(id,route,content,params.keySet(),deadline.child(Duration.ofSeconds(config.agent().actTimeoutSeconds())));
-                    plan=translated.spec();params.putAll(translated.parameters());
-                    if(!translated.parameters().isEmpty()) events.accept(Map.of("kind","case-parameters-extracted","parameterNames",params.keySet()));
+            var config=input.options.config("mapping");
+            return PreparedRun.execute(config,"learn-case",preparation -> {
+                preparation.report.check("Mapping profile and new recipe output",() -> {requireMapping(config);output=preparedOutput(output);});
+                Failure.require(charterFile==null || spec!=null,"CASE_INVALID","Charter learning requires a reviewed specification");
+                if(charterFile!=null) charter=Json.MAPPER.treeToValue(readJson(charterFile),ExplorationCharter.class);
+                Failure.require((spec!=null) != (instructions!=null),"CASE_INVALID","Supply exactly one of --spec or --instructions");
+                var params=new TreeMap<>(input.parameters());CaseSpec supplied=null;String text=null;
+                if(spec!=null) {
+                    Failure.require(id==null && route==null,"CASE_INVALID","--id/--route are supplied by --spec");
+                    supplied=readSpec(spec);
+                    preparation.report.design(supplied.id(),supplied.steps(),params);
+                    reviewSpec(supplied,params,preparation.report);id=supplied.id();route=supplied.startRoute();
+                    if(charter!=null) charter.validate(supplied,params.keySet());
+                } else {
+                    requireNewOutput(parameterOutput(output));
+                    Failure.require(id!=null && route!=null,"CASE_INVALID","Text input requires --id and --route");id=CaseNames.generated(id);
+                    FrameworkConfig.validateRoute(route);text=readText(instructions,40000);
+                    Failure.require(!text.isBlank(),"CASE_INVALID","Test instructions are empty");
                 }
-                return learner.learn(plan,namespace,params,deadline,charter);
+                preparation.report.check("Supplied intent and parameter validation",() -> {});
+                preparation.ready();
+                final CaseSpec prepared=supplied;final String content=text;
+                return session(config,input.persona,id,route,params,"learning",output,(engine,store,model,namespace,deadline,secrets,events) -> {
+                    var learner=new CaseLearner(engine,store,model,config,secrets,events);
+                    CaseSpec plan=prepared;
+                    if(plan==null) {
+                        var translated=learner.planWithParameters(id,route,content,params.keySet(),deadline.child(Duration.ofSeconds(config.agent().actTimeoutSeconds())));
+                        plan=translated.spec();params.putAll(translated.parameters());
+                        if(!translated.parameters().isEmpty()) events.accept(Map.of("kind","case-parameters-extracted","parameterNames",params.keySet()));
+                    }
+                    return learner.learn(plan,namespace,params,deadline,charter);
+                },preparation.root,null);
             });
         }
     }
@@ -126,11 +134,16 @@ public final class CaseCommands {
         @Option(names="--max-pages",defaultValue="5",description="Hard page limit, 1..50; model/action/token/time limits also apply.") int pages;
         @Option(names="--output",required=true,description="New recipe filename; TST_ is added when absent.") Path output;
         public Integer call() {
-            var config=input.options.config("mapping");requireMapping(config);output=preparedOutput(output);id=CaseNames.generated(id);
-            Failure.require(pages>0 && pages<=50 && input.params==null,"CASE_INVALID","Discovery requires 1..50 pages and no business parameters");
-            FrameworkConfig.validateRoute(route);
-            return session(config,input.persona,id,route,Map.of(),"discovery",output,(engine,store,model,namespace,deadline,secrets,events) ->
-                new UiExplorer(engine,store,model,config,secrets,events).discover(id,route,namespace,pages,deadline));
+            var config=input.options.config("mapping");
+            return PreparedRun.execute(config,"discover-ui",preparation -> {
+                requireMapping(config);output=preparedOutput(output);id=CaseNames.generated(id);
+                Failure.require(pages>0 && pages<=50 && input.params==null,"CASE_INVALID","Discovery requires 1..50 pages and no business parameters");
+                FrameworkConfig.validateRoute(route);
+                preparation.report.design(id,List.of(Map.of("route",route,"maxPages",pages,"scope","Visible navigation presence; no business workflow assertion")));
+                preparation.report.check("Discovery route, bounds and output",() -> {});preparation.ready();
+                return session(config,input.persona,id,route,Map.of(),"discovery",output,(engine,store,model,namespace,deadline,secrets,events) ->
+                    new UiExplorer(engine,store,model,config,secrets,events).discover(id,route,namespace,pages,deadline),preparation.root,null);
+            });
         }
     }
     @Command(name="replay-case",mixinStandardHelpOptions=true,description="Execute a learned recipe with runtime parameters and deterministic self-healing. No AI client is constructed.")
@@ -139,11 +152,16 @@ public final class CaseCommands {
         @Option(names="--file",required=true,description="Verified recipe produced by learn-case or discover-ui.") Path file;
         public Integer call() {
             var config=input.options.config("deterministic");
-            Failure.require(config.profile().equals("deterministic"),"CONFIG_INVALID","replay-case requires the deterministic profile");
-            var recipe=CaseRecipe.load(file);var params=input.parameters();String namespace=LocatorStore.namespace(config,input.persona);
-            var store=new LocatorStore(Path.of(config.locators().dir()),namespace,config.locators().mode());recipe.preflight(namespace,store,params);
-            return session(config,input.persona,recipe.id(),recipe.startRoute(),params,"replay",null,(engine,disk,unused,context,deadline,secrets,events) -> {
-                new CaseRunner(engine,disk,config,deadline,events).run(recipe,context,disk,params);return recipe;
+            return PreparedRun.execute(config,"replay-case",preparation -> {
+                Failure.require(config.profile().equals("deterministic"),"CONFIG_INVALID","replay-case requires the deterministic profile");
+                var recipe=CaseRecipe.load(file);var params=input.parameters();
+                preparation.report.design(recipe.id(),recipe.steps(),params);String namespace=LocatorStore.namespace(config,input.persona);
+                var store=new LocatorStore(Path.of(config.locators().dir()),namespace,config.locators().mode());
+                preparation.report.check("Recipe, parameters, namespace and locator repository",() -> recipe.preflight(namespace,store,params));
+                preparation.ready();
+                return session(config,input.persona,recipe.id(),recipe.startRoute(),params,"replay",null,(engine,disk,unused,context,deadline,secrets,events) -> {
+                    new CaseRunner(engine,disk,config,deadline,events).run(recipe,context,disk,params);return recipe;
+                },preparation.root,null);
             });
         }
     }
@@ -184,7 +202,7 @@ public final class CaseCommands {
         boolean learning=!Set.of("replay","maintenance").contains(mode);
         var deadline=Deadline.after(Duration.ofSeconds(config.execution().testTimeoutSeconds()));var secrets=new SecretRegistry();
         Instant startedAt=Instant.now();Path reportRoot=reservedRoot==null?ReportDirectories.create(Path.of(config.report().root()),startedAt):reservedRoot;
-        String runId=reservedRoot==null?reportRoot.getFileName().toString():reportRoot.getParent().getParent().getFileName()+"."+datasetId,attemptId=UUID.randomUUID().toString();
+        String runId=datasetId==null?reportRoot.getFileName().toString():reportRoot.getParent().getParent().getFileName()+"."+datasetId,attemptId=UUID.randomUUID().toString();
         Path journal=Path.of(config.retention().journalDir(),"case-attempts",attemptId+".json");
         var active=new PlaywrightEngine[1];var evidence=new EvidenceService(reportRoot,runId,attemptId,() -> active[0],deadline,secrets,config.evidence().screenshotsAfterSteps());
         var state=new LinkedHashMap<String,Object>();state.put("schemaVersion",1);state.put("runId",runId);state.put("attemptId",attemptId);state.put("caseId",id);
@@ -197,17 +215,23 @@ public final class CaseCommands {
             evidence.event(event);
             if("model-call-started".equals(event.get("kind"))) state.put("modelCalls",event.get("call"));
             if("case-parameters-extracted".equals(event.get("kind"))) state.put("generatedParameters",true);
-            if("case-plan-ready".equals(event.get("kind"))) state.put("trendScope",Json.hash(event.get("plan")));
+            if("case-plan-ready".equals(event.get("kind"))) {
+                state.put("trendScope",Json.hash(event.get("plan")));
+                WorkflowReportExporter.writeDesign(reportRoot,state,evidence.events());
+            }
             if("case-replay-plan".equals(event.get("kind"))) state.put("trendScope",Json.hash(event.get("steps")));
             if("discovery-plan-ready".equals(event.get("kind"))) state.put("trendScope",Json.hash(event));
             if("discovery-completed".equals(event.get("kind"))) state.put("discovery",secrets.redactTree(Json.MAPPER.valueToTree(event)));
             state.put("lastEvent",secrets.redactTree(Json.MAPPER.valueToTree(event)));Json.write(journal,state);
         };
         Json.write(journal,state);
+        var preflight=new PreflightReport(reportRoot,mode);
         CaseRecipe verifiedRecipe=null;
-        RuntimeException primaryFailure=null;
+        RuntimeException primaryFailure=null;boolean prepared=false;
         try {
-            var auth=new JwtAuthenticator(config,secrets);auth.preflight(Set.of(persona));
+            var auth=new JwtAuthenticator(config,secrets);
+            preflight.check("Authentication configuration (no login)",() -> auth.preflight(Set.of(persona)));
+            preflight.ready();prepared=true;
             String identity=config.auth().mode().equals("jwt")?secrets.resolve(new SecretRef(config.persona(persona).usernameRef(),"persona-username")).toLowerCase(Locale.ROOT):BrowserState.path(config,persona).toRealPath().toString();
             try(var lock=ExecutionLocks.shared(config.org().baseUrl(),identity)) {
                 ModelClient model=learning?AiWorkflowClient.create(config.agent(),secrets,events):null;
@@ -244,6 +268,7 @@ public final class CaseCommands {
                 if(Boolean.TRUE.equals(state.get("generatedParameters"))) state.put("parameterFile",parameterOutput(output).toAbsolutePath().toString());
             }
         } catch(Exception failure) {
+            if(!prepared) try {preflight.blocked(failure);}catch(RuntimeException reporting) {failure.addSuppressed(reporting);}
             String code=failure instanceof Failure f?f.code():failure instanceof OverlappingFileLockException?"ENVIRONMENT_UNAVAILABLE":"ENGINE_FAILURE";
             state.put("status","FAILED");state.put("code",code);state.put("diagnostic",secrets.redact(Objects.toString(failure.getMessage(),failure.getClass().getSimpleName())));
             primaryFailure=failure instanceof Failure f?f:new Failure(code,"Case workflow failed; inspect the permanent attempt journal and report");
@@ -253,7 +278,7 @@ public final class CaseCommands {
                 state.put("completedAt",Instant.now());state.put("artifacts",evidence.artifacts());state.put("trendParametersHash",Json.hash(params));
                 Json.write(journal,state);
                 Runnable report=() -> {
-                    WorkflowReportExporter.write(reportRoot,state,evidence.events(),reservedRoot==null);
+                    WorkflowReportExporter.write(reportRoot,state,evidence.events(),datasetId==null);
                     WorkflowReportExporter.verifyEvidence(reportRoot);
                 };
                 if(output!=null && "PASSED".equals(state.get("status")))
@@ -264,13 +289,13 @@ public final class CaseCommands {
                     state.put("status","FAILED");state.put("code",finalizationFailure instanceof Failure f?f.code():"REPORT_GENERATION_FAILED");
                     state.put("diagnostic",secrets.redact(Objects.toString(finalizationFailure.getMessage(),"Workflow finalization failed")));
                     state.remove("recipe");state.remove("parameterFile");
-                    try { Json.write(journal,state);WorkflowReportExporter.write(reportRoot,state,evidence.events(),reservedRoot==null); }
+                    try { Json.write(journal,state);WorkflowReportExporter.write(reportRoot,state,evidence.events(),datasetId==null); }
                     catch(RuntimeException secondary) { finalizationFailure.addSuppressed(secondary); }
                 }
                 if(primaryFailure!=null) primaryFailure.addSuppressed(finalizationFailure);
                 else throw finalizationFailure;
             }
-            if(reservedRoot==null && Files.isRegularFile(reportRoot.resolve("index.html"))) System.out.println("Allure report: "+reportRoot.resolve("index.html"));
+            if(datasetId==null && Files.isRegularFile(reportRoot.resolve("index.html"))) System.out.println("Allure report: "+reportRoot.resolve("index.html"));
             System.out.println("Case data: "+reportRoot.resolve("case-report.json"));System.out.println("Permanent attempt journal: "+journal);
             if(Files.isRegularFile(reportRoot.resolve("test-design.html"))) System.out.println("Implemented test design: "+reportRoot.resolve("test-design.html"));
         }
@@ -278,6 +303,19 @@ public final class CaseCommands {
         if(state.containsKey("parameterFile")) System.out.println("Private runtime parameters: "+state.get("parameterFile"));
         if(state.containsKey("discovery")) System.out.println("Discovery scope (navigation presence only): "+Json.string(state.get("discovery")));
         System.out.println("Case "+id+" PASSED; model calls="+state.get("modelCalls"));return 0;
+    }
+    static void reviewSpec(CaseSpec spec,Map<String,String> params,PreflightReport report) {
+        RuntimeException first=null;int index=0;
+        for(var intent:spec.steps()) {
+            int step=++index;
+            try { report.check("Step "+step+": "+intent.kind()+"; parameter references "+
+                java.util.stream.Stream.of(intent.valueRef(),intent.recordNameRef()).filter(Objects::nonNull).toList(),() -> {
+                var operation=new CaseRecipe.Step(intent.kind(),CaseSpec.targeted(intent.kind())?"validation":null,CaseSpec.targeted(intent.kind())?"validation":null,intent.route(),intent.valueRef(),intent.recordNameRef());
+                Set<String> refs=new HashSet<>();if(intent.valueRef()!=null) refs.add(intent.valueRef());if(intent.recordNameRef()!=null) refs.add(intent.recordNameRef());
+                CaseRecipe.validateParams(refs,params,List.of(operation));
+            }); } catch(RuntimeException failure) { if(first==null) first=failure; }
+        }
+        if(first!=null) throw first;
     }
     static void validateSpecParams(CaseSpec spec,Map<String,String> params) {
         var validation=spec.steps().stream().map(s -> new CaseRecipe.Step(s.kind(),CaseSpec.targeted(s.kind())?"validation":null,CaseSpec.targeted(s.kind())?"validation":null,s.route(),s.valueRef(),s.recordNameRef())).toList();

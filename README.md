@@ -938,6 +938,8 @@ For an existing authorized ChatGPT subscription adapter, pass `--chatgpt-project
 
 ## Automatic Allure reports and screenshots
 
+Case/suite/Java execution also publishes initial **`preflight.html`** with design feasibility and blockers, then **`results.html`** with final outcomes. Structured learning identifies missing runtime parameters by step; invalid selected datasets block dispatch and retain their diagnostics. Live UI availability and business correctness remain execution checks. Learning publishes its interpreted `test-design.html` before case actions. The lightweight final HTML survives missing Node/Allure; successful rendering provides the full `index.html`. See [initial and final HTML contracts](docs/ALLURE_REPORTING.md#initial-feasibility-and-final-html) for scope and failure boundaries.
+
 `run`, `run-suite`, `learn-case`, `discover-ui` and `replay-case` automatically generate a real Allure report when execution finishes, including failed attempts. Open the printed `<run-directory>/index.html` directly in a browser. The single-file HTML includes the report UI and its attachments; no report server or manual generation command is needed.
 
 ### Timestamped report folders

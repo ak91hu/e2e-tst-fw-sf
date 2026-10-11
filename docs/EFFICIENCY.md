@@ -6,6 +6,46 @@ Assessed on October 6, 2026 against repository source, repeated local measuremen
 
 Current learning always checks shared locator definitions and hashed instruction associations before identifying a target. The benchmark helper retains its historical metric names, but its response-cache off/on branches both avoid analyzing the same field twice. Earlier two-to-one receipts below remain dated evidence of the earlier optional within-attempt policy; see [current repository reuse](AI_WORKFLOW.md#smaller-requests-bounded-batches-and-unchanged-maps).
 
+## October 11 source review and reporting changes
+
+This review follows current execution paths in `CaseCommands`, `SuiteCommands`, `RunCoordinator`, `CaseRunner`, `LocatorStore`, `UiMapper` and the reporting exporters. It does not infer live Salesforce throughput or compatibility from earlier benchmark receipts. The framework is suitable as a reusable automation foundation: saved recipe replay constructs no model, Page Object Model remains the default, resource-aware datasets reuse processes with fresh isolated contexts, and evidence/quality/teardown are part of the final verdict. The empty consumer workspace provides no application-specific coverage.
+
+| Priority | Current finding | Result or next action |
+| --- | --- | --- |
+| High, corrected | Learning/replay/suite input checks could fail before reserving a report; design HTML was created only during final export | Main case/suite/Java entry points now retain initial feasibility HTML and blocked preparation results; structured learning shows step-specific parameter blockers and suite preparation retains every invalid selected row |
+| High, corrected | A missing Node runtime prevented any new readable final HTML | Node-independent `results.html` is written before rendering; renderer failure explicitly blocks the summary and keeps raw execution diagnostics |
+| High for adoption | Offline validity cannot prove business feasibility; discovered navigation or generated subsets cannot prove complete workflow coverage | Review translated intent and independent expected results, evaluate representative personas/locales/states and inject known application defects into a private consumer evaluation set |
+| Medium for large semantic pages | `UiMapper` performs nested scans for uniqueness and freshness | Profile representative observation sizes; consider an identity index while retaining exact scope/frame boundaries and ambiguity rejection. No source-only speedup claim is made |
+| Medium for short isolated cases | The renderer starts a Node subprocess for each complete Allure publication, while startup/auth/evidence also have fixed costs | Prefer aggregate `run-suite` publication and existing isolated process reuse. Measure p50/p95 for preflight, browser/auth, observation, actions, screenshots and reporting separately |
+| Medium for large repositories | A warm locator snapshot avoids parsing, but every access still reads/hashes bounded current file bytes | Preserve corruption detection; profile real map shapes before considering immutable run snapshots or alternate persistence with explicit revision checks |
+| Medium for operation | Permanent journals and masked screenshots accumulate; traces require private expiry cleanup | Establish consumer retention/capacity policy without removing required evidence or unresolved mutation journals |
+| Medium for maintainability | The broad CLI surface spans recipes, Java, datasets and external layers with different report boundaries | Keep common reporting utilities, module-owned negative regressions and one documented contract; do not replace these paths with an unbounded agent retry loop |
+
+The added preflight accumulates checks/designs in memory and publishes at preparation completion or failure, avoiding a full growing-document rewrite for every valid row. Final fallback HTML uses no model, browser or renderer subprocess. Its additional I/O is not asserted to be free; measure it with the actual suite size. Existing schema/checksum and deterministic execution contracts are unchanged. See [initial/final reporting](ALLURE_REPORTING.md#initial-feasibility-and-final-html) for exact scope and environmental publication limits.
+
+### Fresh local measurement
+
+The October 11 five-sample run passed on Java 21.0.12.1 using the freshly built CLI, synthetic loopback HTML and the existing scripted provider. Evidence: `report/2026-10-11_14-22-43.941753800Z/efficiency.json`, its real Allure `index.html`, and `.tools/html-report-efficiency.log`. These are ignored local receipts, reproducible with the script below.
+
+| Component | Median, ms | Measured samples |
+| --- | ---: | ---: |
+| Deterministic replay core | 126.43 | 5 |
+| Replay total with one masked PNG | 1008.23 | 5 |
+| First drift/healing total | 1938.03 | 5 |
+| Strict restart after persisted repair | 905.04 | 5 |
+| Fresh browser startup | 674.70 | 10 |
+| One masked PNG | 138.36 | 5 |
+| Allure generation | 2149.61 | 3 |
+| Two cases with fresh browser processes | 2046.56 | 5 |
+| Two cases with process reuse and fresh contexts | 1305.54 | 5 |
+| 1000-entry cold / warm content-validated lookup | 11.77 / 1.53 | 30 per branch |
+
+Process reuse shortened this two-case fixture median by 36.2%. Replay/healing/restart made zero provider calls and rejected a wrong expected value. Three-target batching reduced scripted calls from 3 to 1 in every pair, serialized input from 9781–9787 to 2553 bytes and summed output allowances from 12288 to 896. Fixed token usage and configured illustrative costs remain synthetic, not paid-provider savings.
+
+The narrower same-target reuse switch showed **no speedup**: total medians were 1307.07 ms with that switch off and 1342.00 ms with it on; both branches made one model call. The script keeps repository-target reuse enabled in both branches, so the earlier two-call baseline is no longer reproduced by this particular toggle comparison. Do not carry the historical 23% improvement forward as a current measurement. The three-target optimization and process-reuse comparisons remain separate experiments. The masked-PNG maximum was 990.49 ms and Allure maximum 3402.73 ms, further illustrating why five local samples do not establish production p95.
+
+The measurement excludes Salesforce authentication/network, paid-provider quality/latency and the complete CLI preflight/journal/evidence lifecycle. It therefore supports component-level priorities, not a target-app runtime forecast. The observed CLI archive was 235664218 bytes (about 224.75 MiB), an operational distribution/cache cost rather than an execution speed measurement.
+
 ## Contents
 
 - [Method and reproducibility](#method-and-reproducibility)

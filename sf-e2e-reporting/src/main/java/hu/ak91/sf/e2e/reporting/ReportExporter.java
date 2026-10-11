@@ -9,6 +9,7 @@ public final class ReportExporter {
     private ReportExporter() {}
     public static void write(Path root,RunReport report) {
         Json.write(root.resolve("run-report.json"),report);
+        HtmlSummary.write(root,report.runId(),report.exitCode()==0?"PASSED":"FAILED",report.results().stream().map(r -> Map.of("case",r.caseInfo(),"status",r.status(),"businessVerdict",r.businessVerdict(),"evidenceVerdict",r.evidenceVerdict(),"durationMillis",r.durationMillis(),"code",Objects.toString(r.errorCode(),""),"diagnostic",Objects.toString(r.errorMessage(),""),"secondaryErrors",r.secondaryErrors(),"maskedScreenshots",r.artifacts().size())).toList(),"Final verdict includes user and container teardown, dependency outcomes, browser quality and evidence integrity. Full details and masked screenshots are in the Allure report.");
         Json.write(root.resolve("completion.json"),Map.of("runId",report.runId(),"complete",report.complete(),"selected",report.selection().size(),"completed",report.results().size(),"counts",report.counts(),"exitCode",report.exitCode()));
         StringBuilder md=new StringBuilder("# Salesforce E2E run "+report.runId()+"\n\nSelected: "+report.selection().size()+"; completed: "+report.results().size()+"; exit code: "+report.exitCode()+"\n\n| Case | Result | Evidence |\n| --- | --- | --- |\n");
         StringBuilder xml=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<testsuite name=\"Salesforce E2E\" id=\""+escape(report.runId())+"\" tests=\""+report.results().size()+"\" failures=\""+report.results().stream().filter(r->r.status().equals("FAILED")).count()+"\" errors=\""+report.results().stream().filter(r->Set.of("BLOCKED","EVIDENCE_FAILED").contains(r.status())).count()+"\" skipped=\""+report.results().stream().filter(r->Set.of("SKIPPED","CANCELLED","NOT_RUN_DEPENDENCY").contains(r.status())).count()+"\">\n");
@@ -58,7 +59,7 @@ public final class ReportExporter {
         xml.append("</testsuite>");html.append("</table></html>");
         writeText(root.resolve("summary.md"),md.toString());writeText(root.resolve("junit.xml"),xml.toString());writeText(root.resolve("summary.html"),html.toString());
         Json.write(root.resolve("quality-summary.json"),QualityReports.summarize(report.results().stream().flatMap(r -> r.events().stream()).toList()));
-        AllureReports.generate(root);
+        HtmlSummary.render(root);
     }
     private static String escape(String value) { return value.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;").replace("'","&#39;"); }
     private static void writeText(Path path,String content) {

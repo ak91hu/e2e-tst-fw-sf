@@ -36,11 +36,11 @@ class ImpactCommandsTest {
         assertTrue(Files.isRegularFile(fixture.runRoot().resolve("trends.html")));
     }
     @Test void unknownChangesRequireFullPreflightBeforeAnyExecution() throws Exception {
-        prepare(List.of("unknown.xml"));var command=command();command.executor=(config,row,path) -> {fail("Invalid full-suite preflight must stop dispatch");return 0;};assertThrows(Failure.class,command::call);assertFalse(Files.exists(root.resolve("report")));
+        prepare(List.of("unknown.xml"));var command=command();command.executor=(config,row,path) -> {fail("Invalid full-suite preflight must stop dispatch");return 0;};assertThrows(Failure.class,command::call);assertTrue(Files.readString(fixture.runRoot().resolve("preflight.html")).contains("BLOCKED"));
     }
     @Test void noChangesCreateAnExplicitOfflinePlanAndCannotBecomeAGreenExecution() throws Exception {
         prepare(List.of());Path output=root.resolve("impact.json");assertEquals(0,new CommandLine(new ImpactCommands()).execute("--suite",fixture.manifest.toString(),"--coverage",coverage.toString(),"--changes",changes.toString(),"--output",output.toString()));assertEquals("NO_CHANGES",Json.read(output,ChangeImpact.Plan.class).decision());
-        assertEquals("NO_TESTS",assertThrows(Failure.class,command()::call).code());assertFalse(Files.exists(root.resolve("report")));String saved=Files.readString(output);assertNotEquals(0,new CommandLine(new ImpactCommands()).execute("--suite",fixture.manifest.toString(),"--coverage",coverage.toString(),"--changes",changes.toString(),"--output",output.toString()));assertEquals(saved,Files.readString(output));
+        assertEquals("NO_TESTS",assertThrows(Failure.class,command()::call).code());assertTrue(Files.readString(fixture.runRoot().resolve("preflight.html")).contains("BLOCKED"));String saved=Files.readString(output);assertNotEquals(0,new CommandLine(new ImpactCommands()).execute("--suite",fixture.manifest.toString(),"--coverage",coverage.toString(),"--changes",changes.toString(),"--output",output.toString()));assertEquals(saved,Files.readString(output));
     }
-    @Test void manualFiltersCannotNarrowSafeImpactFallback() throws Exception {prepare(List.of("unknown.xml"));assertEquals("IMPACT_INVALID",assertThrows(Failure.class,command("--dataset","first")::call).code());assertFalse(Files.exists(root.resolve("report")));}
+    @Test void manualFiltersCannotNarrowSafeImpactFallback() throws Exception {prepare(List.of("unknown.xml"));assertEquals("IMPACT_INVALID",assertThrows(Failure.class,command("--dataset","first")::call).code());assertTrue(Files.readString(fixture.runRoot().resolve("preflight.html")).contains("BLOCKED"));}
 }

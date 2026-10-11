@@ -11,6 +11,7 @@ public final class RunSession {
     public final String runId;
     public final Path root;
     public final List<CaseInfo> selection;
+    final PreflightReport preflight;
     public final Instant started=Instant.now();
     private final Map<String,AttemptResult> results=new LinkedHashMap<>();
     @FunctionalInterface interface ContextFactory { SfTestContext create(RunSession session,CaseInfo info); }
@@ -19,10 +20,13 @@ public final class RunSession {
     public RunSession(FrameworkConfig config,List<CaseInfo> selection) {
         this(config,selection,(session,info) -> new SfTestContext(session.config,session.runId,info,session.root));
     }
-    RunSession(FrameworkConfig config,List<CaseInfo> selection,ContextFactory factory) {
+    RunSession(FrameworkConfig config,List<CaseInfo> selection,ContextFactory factory) { this(config,selection,factory,null); }
+    RunSession(FrameworkConfig config,List<CaseInfo> selection,ContextFactory factory,Path preparedRoot) {
         this.factory=factory;
-        this.config=config;this.selection=List.copyOf(selection);root=ReportDirectories.create(Path.of(config.report().root()),started);
+        this.config=config;this.selection=List.copyOf(selection);root=preparedRoot==null?ReportDirectories.create(Path.of(config.report().root()),started):preparedRoot;
         runId=root.getFileName().toString();
+        preflight=new PreflightReport(root,"JUnit run");
+        if(preparedRoot==null) preflight.design("Selected Java cases (method bodies require execution)",this.selection);
         Json.write(root.resolve("selection.json"),Map.of("schemaVersion",1,"runId",runId,"profile",config.profile(),"selected",selection.size(),"cases",selection));
         Json.write(root.resolve("resolved-config.safe.json"),config);
         Json.write(root.resolve("trend-context.json"),Map.of("contextHash",Json.hash(Map.of("selection",selection,"namespaces",selection.stream().map(CaseInfo::persona).distinct().map(p -> hu.ak91.sf.e2e.core.locator.LocatorStore.namespace(config,p)).sorted().toList(),"workers",config.execution().workers()))));

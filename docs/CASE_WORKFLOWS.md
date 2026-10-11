@@ -171,7 +171,7 @@ For text designs, write one explicit instruction per nonblank line, in execution
 
 This validates ordered line coverage, not natural-language semantic equivalence. A model can still misunderstand an action or claim an incorrect source reference. Review translated targets, scopes and independent assertions through `plan-case`; use `--spec` for caller-controlled exact operations. Keep multiple independent actions on separate lines so omissions inside a compound sentence are easier to detect. No model judge replaces the caller's expected outcome.
 
-The learner establishes its own `CaseSpec` before case actions, executes it in order and stops at the first unsuccessful step. After learning, the command prints **Implemented test design** with the run-owned `test-design.html` path. Allure also includes an **Implemented test design** HTML attachment. The standalone document contains:
+The command first publishes [offline feasibility HTML](ALLURE_REPORTING.md#initial-feasibility-and-final-html), including step/parameter blockers before authentication. The learner establishes its own `CaseSpec` before case actions, publishes `test-design.html` synchronously when that plan is ready, executes it in order and stops at the first unsuccessful step. After learning, the command prints **Implemented test design** with the run-owned `test-design.html` path. Allure also includes an **Implemented test design** HTML attachment. The standalone document contains:
 
 - Case ID, start route and final attempt status/code.
 - Every planned operation, target, scope and input/expected-result parameter reference, in order.
@@ -263,7 +263,7 @@ Framework model requests for target discovery omit field values and expected val
 
 ## Dataset suites and quality gates
 
-`validate-suite` preflights a private manifest without a browser or model. `run-suite` executes its selected recipes/parameter files sequentially in fresh browser contexts and generates one timestamped Allure report. Dataset IDs, personas and optional tags distinguish invocations; paths resolve relative to the manifest. Failed/blocked/skipped selected rows cannot produce a passing aggregate. See the [README suite examples](../README.md#data-driven-regression-suites).
+`validate-suite` preflights a private manifest without a browser or model. `run-suite` checks every selected dataset before dispatch, publishes initial `preflight.html`, then executes recipes/parameter files in isolated contexts with configured resource-aware workers and generates final `results.html` plus one timestamped Allure report. Invalid preparation retains blocked HTML without browser/model construction. Dataset IDs, personas and optional tags distinguish invocations; paths resolve relative to the manifest. Failed/blocked/skipped selected rows cannot produce a passing aggregate. See the [README suite examples](../README.md#data-driven-regression-suites).
 
 Authenticated execution collects bounded browser/console/HTTP/transport issues and applies enabled quality gates before accepting completion. A browser defect can fail a UI presence check that otherwise passed. Diagnostics, reviewed waivers, locator drift and assertion events appear in Allure and `quality-summary.json`. See [quality gates](../README.md#quality-gates-and-defect-detection).
 

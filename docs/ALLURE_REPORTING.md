@@ -10,9 +10,22 @@ Published standalone HTML includes a content security policy that permits embedd
 
 ## Contents
 
+- [Initial feasibility and final HTML](#initial-feasibility-and-final-html)
 - [What the report contains](#what-the-report-contains)
 - [Screenshots are enabled by default](#screenshots-are-enabled-by-default)
 - [Files and commands](#files-and-commands)
+
+## Initial feasibility and final HTML
+
+`learn-case`, `replay-case`, `discover-ui`, `run-suite` and CLI Java `run` reserve their report directory after configuration loading and before loading/validating consumer execution inputs. `preflight.html` initially says `CHECKING`; preparation publishes the ordered designs and either `READY` or `BLOCKED` before business actions. Missing parameters in structured learning are identified by step/reference. Suite preparation examines every selected row and retains all detected row blockers before refusing the entire dispatch. Empty selections, unsupported/invalid input and incompatible recipes/maps cannot become green execution reports. The standalone validation/planning commands retain their existing offline output contracts.
+
+`READY` establishes only the listed offline checks. It cannot prove current UI availability, permissions, uniquely identifiable controls, hidden/future states or business outcomes. Auth configuration is checked before file-workflow browser/model construction. Java preflight lists selected case metadata/dependencies; arbitrary Java method bodies cannot be proved feasible offline. Direct text learning establishes its detailed interpreted design after planning. `test-design.html` is written synchronously on `case-plan-ready`, before the learner starts case actions, then finalized with ordered completed/unfinished/unexecuted steps.
+
+Every file-workflow, suite and coordinated Java export writes `results.html` before invoking Allure. It retains the final verdict, diagnostics and available step or dataset/case outcomes. Runtime parameter maps and private raw records/traces are excluded. A fresh run initially exposes this fallback at `index.html`; successful Allure rendering replaces it with the full interactive report. If Node/Allure fails, the standalone results explicitly say `BLOCKED`, retain the original execution information and report the rendering code. Raw JSON and original evidence remain available. Rebuilding preserves a previously published Allure HTML when the renderer fails; use the updated `results.html` and failed command exit code in that situation.
+
+`preflight.json` and `summary-generation.json` retain SHA-256 receipts checked by run/workflow/suite integrity verification when present. Historical reports without them remain compatible; recipe/cache checksums, configuration keys and CLI flags are unchanged. Preflight failures deliberately leave HTML diagnostics even though no browser started. Such preparation-only reports are not completed execution evidence for `report verify` or a successful subset for failure selection.
+
+Configuration/argument parsing failure before the report location is known, unwritable storage, abrupt process termination or machine failure cannot guarantee file publication. Maintenance and autonomous commands keep their existing early input-validation boundaries; their opened file sessions get preflight/final HTML. Mapping and standalone planning/validation are diagnostic workflows rather than executed case verdicts. Preparation diagnostics contain no raw exception messages, and provided parameter values are redacted from design metadata. As with other reports, consumer targets/labels may still require private storage.
 
 ## What the report contains
 
@@ -56,7 +69,9 @@ Names encode the actual start instant as `yyyy-MM-dd_HH-mm-ss.SSSSSSSSSZ` in UTC
 
 | Path within the run | Content |
 | --- | --- |
-| `index.html`, `allure-report/index.html` | Identical standalone Allure HTML reports |
+| `index.html`, `allure-report/index.html` | Identical standalone Allure HTML after successful rendering; a fresh failed-render run has a standalone fallback only at the root |
+| `preflight.html`, `preflight.json` | Initial offline design/feasibility checks, blockers and checksummed HTML receipt |
+| `results.html`, `summary-generation.json` | Node-independent final step/dataset/Java outcomes and HTML checksum, including reporting failure |
 | `allure-results/` | Allure result JSON, PNG copies and redacted event attachments |
 | `allure-generation.json` | Engine/version, generation timestamp and HTML checksum |
 | `allure-generation.log` | Output of the actual Allure renderer |
@@ -75,10 +90,10 @@ java -jar sf-e2e-cli/target/sf-e2e.jar report build --run <run-directory>
 java -jar sf-e2e-cli/target/sf-e2e.jar report trends --run <run-directory> --window 100
 ```
 
-Verification checks evidence and the generated HTML checksum. When a `testDesign` receipt is present, it must be a valid object with the current attempt's attachment filename and SHA-256; both the standalone design and its Allure copy must match and remain inside the run directory. Malformed metadata or a foreign attachment fails verification even when the bytes match. Historical reports without this additive receipt remain readable. Rebuilding consumes saved data and invokes Allure again without opening Salesforce or calling a model. Generation has a 120-second limit. If rendering fails, raw results remain available; the CLI returns a reporting/evidence failure (exit code 4). Inspect `allure-generation.log`, resolve the Java/cache/filesystem issue and rebuild.
+Verification checks evidence and the generated HTML checksum. When a `testDesign` receipt is present, it must be a valid object with the current attempt's attachment filename and SHA-256; both the standalone design and its Allure copy must match and remain inside the run directory. Malformed metadata or a foreign attachment fails verification even when the bytes match. Historical reports without this additive receipt remain readable. Rebuilding consumes saved data and invokes Allure again without opening Salesforce or calling a model. Generation has a 120-second limit. If rendering fails, raw results remain available; the CLI returns a reporting/evidence failure (exit code 4). Inspect `allure-generation.log`, resolve the Node/cache/filesystem issue and rebuild.
 
 After a successful render, both published HTML copies are verified before removing that render's owned `.allure-render-<UUID>` temporary directory. Cleanup checks the resolved parent and never follows symbolic links. Raw results, screenshots, existing report directories and failed-render diagnostics remain preserved. An I/O cleanup failure retains the temporary directory without invalidating the published report; historical temporary outputs are not swept automatically.
 
-Suites render once after selected dataset completion. Allure result names include dataset IDs and history separates datasets/personas. Child cases do not create independent HTML reports; their raw data/evidence remains under `cases/`. Verification checks child completion, evidence ownership/content, unique dataset/attempt identities, case-data checksums and aggregate status. Run/case identities must agree with the parent suite; replay mode and zero model calls must agree with deterministic execution. Rebuild reexports verified child data into known owned result files; unexpected aggregate result files are rejected. A selected failed/skipped/blocked row can never validate as a passing suite. A passing child needs distinct owned captures/completion evidence and cannot contain failed enabled application gates.
+Suites render once after selected dataset completion. Allure result names include dataset IDs and history separates datasets/personas. Child cases do not invoke independent Allure rendering; their lightweight preflight/result HTML remains available and their raw data/evidence remains under `cases/`. Verification checks child completion, evidence ownership/content, unique dataset/attempt identities, case-data checksums and aggregate status. Run/case identities must agree with the parent suite; replay mode and zero model calls must agree with deterministic execution. Rebuild reexports verified child data into known owned result files; unexpected aggregate result files are rejected. A selected failed/skipped/blocked row can never validate as a passing suite. A passing child needs distinct owned captures/completion evidence and cannot contain failed enabled application gates.
 
 `map-ui`, `verify-ui` and `inspect-ui` retain their mapping/locator diagnostic exports. The automatic test-report lifecycle applies to JUnit cases and learn/discover/replay workflows.

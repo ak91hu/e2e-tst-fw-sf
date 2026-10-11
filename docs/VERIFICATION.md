@@ -4,6 +4,7 @@
 
 ## Contents
 
+- [October 11 HTML lifecycle and efficiency](#october-11-html-lifecycle-and-efficiency)
 - [October 10 case maintenance](#october-10-case-maintenance)
 - [October 10 final code review](#october-10-final-code-review)
 - [October 8 audit capability follow-up](#october-8-audit-capability-follow-up)
@@ -15,6 +16,20 @@
 - [Completion audit](#completion-audit)
 - [What the evidence does and does not establish](#what-the-evidence-does-and-does-not-establish)
 - [Live org validation](#live-org-validation)
+
+## October 11 HTML lifecycle and efficiency
+
+Initial feasibility HTML now precedes input validation/business dispatch in main case, suite and Java execution entry points. It identifies structured step parameter blockers and every invalid selected dataset. Interpreted learning design HTML is published before case actions; final standalone HTML preserves outcomes even when Node/Allure is unavailable. Late finalization cannot leave a successful standalone verdict. Additive HTML receipts retain historical report and recipe/cache compatibility. See [reporting scope and limits](ALLURE_REPORTING.md#initial-feasibility-and-final-html) and the [current efficiency review](EFFICIENCY.md#october-11-source-review-and-reporting-changes).
+
+The Windows full reactor passed `mvnw.cmd -B -ntp verify -Pchecks` on JDK 27+35 in **8 minutes 48 seconds: 407 checks in 66 suites, comprising 339 unit/component and 68 browser executions**, with zero failures/errors/skips. Receipt: `.tools/html-report-full-verify.log`. After the late-finalization refinement, the final focused reactor passed **75 checks in 11 suites (74 unit/component and one CLI browser fixture)** in 2 minutes 31 seconds:
+
+```powershell
+.\mvnw.cmd -B -ntp -pl sf-e2e-cli -am verify -Pchecks "-Dtest=HtmlLifecycleTest,TestDesignReportTest,AllureReportingTest,ReportIntegrityTest,CaseCommandsTest,SuiteCommandsTest,ImpactCommandsTest,ExecutionLifecycleTest,LifecycleDependencyTest,GuideCommandTest" "-Dsurefire.failIfNoSpecifiedTests=false" "-Dit.test=ExplorationCommandsHarnessIT" "-Dfailsafe.failIfNoSpecifiedTests=false"
+```
+
+Receipt: `.tools/html-report-final-check.log`. The checks cover early blocked HTML without browser dispatch, multiple invalid datasets, step-specific missing references, escaped/redacted design text, uncertain/unexecuted outcomes, changed/missing HTML, unavailable Node preserving raw results, JUnit teardown/dependencies and all embedded guide topics. A final presentation hardening escapes resumed check metadata and classifies missing preflight status as an integrity failure; focused HTML/guide checks and repackaging cover that last change.
+
+All **10 Node adapter checks** passed. The language/link validator and `git diff --check` passed. Java 21.0.12.1 successfully ran the packaged CLI's synthetic missing-parameter case and the five-sample efficiency benchmark; the invalid design correctly returned nonzero and retained blocked HTML without authentication or model construction. Its artifacts are under `report/2026-10-11_14-22-32.433896300Z`. Headless Chromium rendered the preflight/results HTML, verified the visible blockers and viewport fit, and produced inspected PNGs under `.tools/html-report-preview/`. Benchmark results and exclusions are recorded in [the fresh measurement](EFFICIENCY.md#fresh-local-measurement). No live target org, paid provider or hosted CI was exercised. The default shell still resolves Java 17; select a supported JDK before running the CLI.
 
 ## October 10 case maintenance
 

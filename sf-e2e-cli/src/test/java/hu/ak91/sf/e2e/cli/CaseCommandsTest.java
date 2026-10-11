@@ -17,6 +17,29 @@ class CaseCommandsTest {
         return new CaseRecipe(1,"TST_publication",Json.hash("fixture"),"fixture-engine","/app",
             List.of(new CaseRecipe.Step("expectRoute",null,null,"/app",null,null)));
     }
+    @Test void missingSpecParametersProduceOrderedBlockersAndHtmlBeforeAuthentication() throws Exception {
+        Path config=root.resolve("project.yaml"),spec=root.resolve("spec.json");
+        Files.writeString(config,"schemaVersion: 1\nprojectId: preflight-fixture\nprofile: mapping\norg:\n  baseUrl: https://fixture.example\nlocators:\n  mode: read-write\nreport:\n  root: reports\n");
+        Json.write(spec,new CaseSpec("TST_missing","/app",List.of(new CaseSpec.Step("fill","Input",null,null,"input",null),new CaseSpec.Step("expectValue","Input",null,null,"expected",null))));
+        assertNotEquals(0,run("learn-case","--config",config.toString(),"--spec",spec.toString(),"--output",root.resolve("TST_missing.json").toString()));
+        try(var files=Files.list(root.resolve("reports"))) {
+            Path report=files.findFirst().orElseThrow();String html=Files.readString(report.resolve("preflight.html"));
+            assertTrue(html.contains("Step 1: fill"));assertTrue(html.contains("Step 2: expectValue"));assertTrue(html.contains("CASE_PARAMETER_REQUIRED"));
+            assertTrue(Files.readString(report.resolve("results.html")).contains("NOT EXECUTED"));assertFalse(Files.exists(root.resolve("TST_missing.json")));
+        }
+    }
+    @Test void lateFinalizationFailureCannotLeaveSuccessfulFallbackHtml() throws Exception {
+        Path config=root.resolve("project.yaml");Files.writeString(config,"schemaVersion: 1\nprojectId: late-fixture\nreport:\n  root: reports\n");
+        var policy=FrameworkConfig.load(config,Map.of());
+        assertThrows(Failure.class,() -> PreparedRun.execute(policy,"synthetic finalization",preparation -> {
+            preparation.ready();hu.ak91.sf.e2e.reporting.HtmlSummary.write(preparation.root,"synthetic", "PASSED",List.of(Map.of("step",1,"operation","expectVisible")),"Synthetic summary before a late finalization failure");
+            throw new Failure("ENGINE_FAILURE","PRIVATE_SENTINEL");
+        }));
+        try(var files=Files.list(root.resolve("reports"))) {
+            String html=Files.readString(files.findFirst().orElseThrow().resolve("results.html"));
+            assertTrue(html.contains("<strong>BLOCKED</strong>"));assertTrue(html.contains("expectVisible"));assertTrue(html.contains("ENGINE_FAILURE"));assertFalse(html.contains("PRIVATE_SENTINEL"));
+        }
+    }
     @Test void failedSessionCleanupCannotPublishAVerifiedRecipe() {
         Path output=root.resolve("TST_cleanup.json");var phases=new ArrayList<String>();
         var failure=new Failure("ENGINE_FAILURE","Synthetic cleanup failure");

@@ -43,12 +43,17 @@ class SuiteCommandsTest {
         public Observation.Node resolve(SemanticTarget t,Observation o) {throw new UnsupportedOperationException();}public void perform(Action a,Observation o,Deadline d) {throw new UnsupportedOperationException();}
         public Map<String,String> readVisibleFields(Deadline d) {return Map.of();}public void poll(Deadline d) {}public String capabilityVersion() {return "engine";}public void close() {}
     }
-    @Test void preflightRejectsAnyInvalidSelectedRowBeforeCreatingAReportOrBrowser() throws Exception {
-        prepare();Json.write(manifest,new CaseSuite(1,"regression",List.of(new CaseSuite.Row("first","recipe.json",null,null,List.of()),new CaseSuite.Row("bad","missing.json",null,null,List.of()))));
-        var cmd=command(false);cmd.executor=(c,p,r) -> {fail("Browser execution must not start");return 0;};assertThrows(Failure.class,cmd::call);assertFalse(Files.exists(root.resolve("report")));
+    @Test void preflightRetainsEveryInvalidSelectedRowWithoutStartingBrowser() throws Exception {
+        prepare();Json.write(manifest,new CaseSuite(1,"regression",List.of(new CaseSuite.Row("first","recipe.json",null,null,List.of()),new CaseSuite.Row("bad","missing.json",null,null,List.of()),new CaseSuite.Row("also-bad","missing-too.json",null,null,List.of()))));
+        var cmd=command(false);cmd.executor=(c,p,r) -> {fail("Browser execution must not start");return 0;};assertThrows(Failure.class,cmd::call);
+        Path report=runRoot();String html=Files.readString(report.resolve("preflight.html"));
+        assertTrue(html.contains("Dataset first"));assertTrue(html.contains("Dataset bad"));assertTrue(html.contains("Dataset also-bad"));
+        assertTrue(html.contains("BLOCKED"));assertFalse(Files.exists(report.resolve("cases")));
+        assertTrue(Files.readString(report.resolve("results.html")).contains("NOT EXECUTED"));PreflightReport.verify(report);HtmlSummary.verify(report);
     }
     @Test void failedDatasetDoesNotStopIndependentRowsOrBecomeASuccessfulSuite() throws Exception {
         prepare();var cmd=command(false);List<String> executed=new ArrayList<>();cmd.executor=(c,p,path) -> {
+            assertTrue(Files.isRegularFile(path.getParent().getParent().resolve("preflight.html")));
             executed.add(p.row().id());state(path,p,p.row().id().equals("first")?"FAILED":"PASSED",p.row().id().equals("first")?"ASSERTION_FAILED":null);
             if(p.row().id().equals("first"))throw new Failure("ASSERTION_FAILED","Wrong business outcome");return 0;
         };

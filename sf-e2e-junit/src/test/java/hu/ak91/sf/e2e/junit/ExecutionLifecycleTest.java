@@ -60,11 +60,19 @@ class ExecutionLifecycleTest {
     RunReport run(Class<?>... classes) {
         var config=config();var plan=SelectionPlanner.plan(SelectionPlanner.discover(List.of(classes)),"deterministic",null,null);
         var report=RunCoordinator.run(config,plan,(session,info) -> {
-            try { return new SfTestContext(config,session.runId,info,session.root,new Engine()); }
+            try { assertTrue(Files.readString(session.root.resolve("preflight.html")).contains("READY"));return new SfTestContext(config,session.runId,info,session.root,new Engine()); }
             catch(Exception error) { throw new AssertionError(error); }
         });
         ReportIntegrityVerifier.verify(root.resolve("runs").resolve(report.runId()),report,2);
+        assertTrue(Files.isRegularFile(root.resolve("runs").resolve(report.runId()).resolve("results.html")));
         assertEquals(report.selection().size(),report.results().size());return report;
+    }
+    @Test void emptyJavaSelectionCreatesBlockedHtmlWithoutConstructingAContext() throws Exception {
+        var c=config();assertEquals("NO_TESTS",assertThrows(Failure.class,() -> RunCoordinator.run(c,List.of(),(session,info) -> {throw new AssertionError("No context is allowed");})).code());
+        try(var files=Files.list(root.resolve("runs"))) {
+            Path report=files.findFirst().orElseThrow();assertTrue(Files.readString(report.resolve("preflight.html")).contains("NO_TESTS"));
+            assertTrue(Files.readString(report.resolve("results.html")).contains("NOT EXECUTED"));
+        }
     }
     @ExtendWith(SfE2eExtension.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     static class Successful {

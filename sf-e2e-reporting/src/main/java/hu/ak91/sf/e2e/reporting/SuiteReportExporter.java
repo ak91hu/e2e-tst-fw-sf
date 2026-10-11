@@ -9,6 +9,7 @@ public final class SuiteReportExporter {
     private SuiteReportExporter() {}
     @SuppressWarnings("unchecked") public static void write(Path root,Map<String,Object> suite) {
         verifyRows(root,suite);Json.write(root.resolve("suite-report.json"),suite);
+        HtmlSummary.write(root,suite.get("suiteId").toString(),suite.get("status").toString(),(List<?>)suite.get("datasets"),"Every selected dataset is retained, including skipped and blocked rows. Each row links to its isolated evidence directory in the structured results.");
         List<Map<String,Object>> events=new ArrayList<>();
         try {
             Path results=root.resolve("allure-results");Files.createDirectories(results);
@@ -24,10 +25,11 @@ public final class SuiteReportExporter {
             }
             try(var files=Files.list(results)) { Failure.require(files.allMatch(file -> owned.containsKey(file.getFileName().toString()) && Files.isRegularFile(file)),"REPORT_RUN_MISMATCH","Unexpected files in suite Allure results"); }
             for(var file:owned.entrySet()) Files.copy(file.getValue(),results.resolve(file.getKey()),StandardCopyOption.REPLACE_EXISTING);
-            Json.write(root.resolve("quality-summary.json"),QualityReports.summarize(events));AllureReports.generate(root);
+            Json.write(root.resolve("quality-summary.json"),QualityReports.summarize(events));HtmlSummary.render(root);
         } catch(Failure f) { throw f; } catch(Exception e) { throw new Failure("EVIDENCE_INCOMPLETE","Cannot aggregate suite evidence"); }
     }
     @SuppressWarnings("unchecked") private static void verifyRows(Path root,Map<String,Object> suite) {
+        PreflightReport.verify(root);HtmlSummary.verify(root);
         Failure.require(((Number)suite.getOrDefault("schemaVersion",0)).intValue()==1 && Boolean.TRUE.equals(suite.get("complete")),"REPORT_RUN_MISMATCH","Suite is incomplete");
         String run=Objects.toString(suite.get("runId"),"");
         Failure.require(!run.isBlank() && suite.get("modelCalls") instanceof Number calls && calls.doubleValue()==0,

@@ -24,7 +24,8 @@ public final class SuiteCommands {
         @Option(names="--last-failed",description="Verified previous suite report directory; selects unsuccessful rows and prerequisite closure.") Path lastFailed;
         ChangeImpact.Plan impact;
         Map<String,String> previousInputs;
-        List<Prepared> prepare(FrameworkConfig config) {
+        List<Prepared> prepare(FrameworkConfig config) { return prepare(config,null); }
+        List<Prepared> prepare(FrameworkConfig config,PreflightReport report) {
             Failure.require(config.profile().equals("deterministic"),"CONFIG_INVALID","Suites execute only in the deterministic profile");
             Failure.require(options.caseId==null && options.tag==null && options.testClasses.isEmpty(),"CONFIG_INVALID","Use dataset/include-tag filters for file suites");
             var suite=CaseSuite.load(file);Path parent=file.toAbsolutePath().getParent();List<Prepared> result=new ArrayList<>();
@@ -44,16 +45,25 @@ public final class SuiteCommands {
                 Map<String,CaseSuite.Row> indexed=new HashMap<>();suite.cases().forEach(row -> indexed.put(row.id(),row));selection=impact.selected().stream().map(indexed::get).toList();
             }else selection=suite.select(tags,datasets);
             selection=SuiteSelection.shard(selection,shard);
+            RuntimeException firstFailure=null;
             for(var row:selection) {
+                try {
                 Persona persona=Persona.valueOf(row.persona());config.persona(persona);
                 var recipe=CaseRecipe.load(parent.resolve(row.recipe()).normalize());
                 var paramsInput=new CaseCommands.InputOptions();paramsInput.params=row.params()==null?null:parent.resolve(row.params()).normalize();
                 var params=paramsInput.parameters();String namespace=LocatorStore.namespace(config,persona);
+                if(report!=null) report.design(row.id(),recipe.steps(),params);
                 recipe.preflight(namespace,new LocatorStore(Path.of(config.locators().dir()),namespace,config.locators().mode()),params);
                 var prepared=new Prepared(row,recipe,params,persona);
                 if(lastFailed!=null) Failure.require(inputHash(prepared,config).equals(previousInputs.get(row.id())),"SELECTION_STALE","Failure selection inputs changed; review recipes/values and create a fresh selection");
                 result.add(prepared);
+                if(report!=null) report.check("Dataset "+row.id(),() -> {});
+                } catch(RuntimeException failure) {
+                    if(report==null) throw failure;
+                    try { report.check("Dataset "+row.id(),() -> {throw failure;}); } catch(RuntimeException recorded) { if(firstFailure==null) firstFailure=recorded; }
+                }
             }
+            if(firstFailure!=null) throw firstFailure;
             return List.copyOf(result);
         }
     }
@@ -71,31 +81,35 @@ public final class SuiteCommands {
         @FunctionalInterface interface Executor { int run(FrameworkConfig c,Prepared p,Path root); }
         Executor executor=(c,p,root) -> { hu.ak91.sf.e2e.engine.PlaywrightEngine.ensureWorkerRuntime(c);return CaseCommands.replayDataset(c,p.persona(),p.recipe(),p.params(),root,p.row().id()); };
         public Integer call() {
-            var config=input.options.config("deterministic");var rows=input.prepare(config);var spec=CaseSuite.load(input.file);Instant started=Instant.now();
-            var tasks=rows.stream().map(p -> {Set<String> locks=new HashSet<>(p.row().resources());String ref=config.auth().mode().equals("jwt")?config.persona(p.persona()).usernameRef():config.persona(p.persona()).storageStateRef();String identity=Objects.toString(System.getenv(ref),ref);if(config.auth().mode().equals("jwt")) identity=identity.toLowerCase(Locale.ROOT);else if(System.getenv(ref)!=null) try {identity=Path.of(identity).toRealPath().toString();}catch(java.io.IOException ignored) {}locks.add("identity:"+Json.hash(config.org().baseUrl()+"|"+identity));return new DatasetScheduler.Task<>(p.row().id(),p.row().after(),locks,p);}).toList();
-            DatasetScheduler.validate(tasks);
-            Path root=ReportDirectories.create(Path.of(config.report().root()),started);List<Map<String,Object>> completed=new ArrayList<>();int exit=0;
-            if(input.impact!=null) Json.write(root.resolve("impact-plan.json"),input.impact);
-            var results=DatasetScheduler.run(tasks,config.execution().workers(),failFast,p -> executeRow(config,root,p),code -> code==0,hu.ak91.sf.e2e.engine.PlaywrightEngine::closeWorkerRuntime);
-            int resultIndex=0;
-            for(var prepared:rows) {
-                var row=prepared.row();Path child=SafePaths.inside(root,"cases/"+row.id());
-                var execution=results.get(resultIndex++);
-                if(execution.status().equals("SKIPPED")) placeholder(root,child,prepared,"SKIPPED","NOT_RUN_DEPENDENCY_OR_FAIL_FAST");
-                else if(execution.error()!=null) { String code=execution.error() instanceof Failure f?f.code():"ENGINE_FAILURE";if(!Files.isRegularFile(child.resolve("case-report.json"))) placeholder(root,child,prepared,"BLOCKED",code);exit=Math.max(exit,code.equals("CANCELLED")?130:2); }
-                else exit=Math.max(exit,execution.value());
-                var state=Json.read(child.resolve("case-report.json"),Map.class);
-                if(!"PASSED".equals(state.get("status"))) exit=Math.max(exit,1);
-                completed.add(Map.of("datasetId",row.id(),"caseId",prepared.recipe().id(),"directory","cases/"+row.id(),"status",state.get("status"),"checksum",Json.hash(state),"tags",row.tags(),"inputHash",inputHash(prepared,config)));
-            }
-            Map<String,Object> suite=new LinkedHashMap<>();suite.put("schemaVersion",1);suite.put("suiteId",spec.id());suite.put("runId",root.getFileName().toString());
-            suite.put("startedAt",started);suite.put("completedAt",Instant.now());suite.put("selected",rows.size());suite.put("complete",true);suite.put("status",exit==0?"PASSED":"FAILED");
-            suite.put("exitCode",exit);suite.put("modelCalls",0);suite.put("datasets",completed);
-            suite.put("suiteSourceHash",SuiteSelection.sourceHash(spec));if(input.shard!=null) suite.put("shard",input.shard);
-            if(input.lastFailed!=null) suite.put("selectionSource","last-failed");
-            suite.put("trendContext",Json.hash(Map.of("workers",config.execution().workers(),"rows",rows.stream().map(p -> Map.of("row",p.row(),"recipe",Json.hash(p.recipe()),"parametersHash",Json.hash(p.params()),"namespace",Json.hash(LocatorStore.namespace(config,p.persona())))).toList())));
-            SuiteReportExporter.write(root,suite);
-            System.out.println("Suite "+spec.id()+": "+suite.get("status")+"; datasets="+rows.size()+"; model calls=0");System.out.println("Allure report: "+root.resolve("index.html"));return exit;
+            var config=input.options.config("deterministic");
+            return PreparedRun.execute(config,"run-suite",preparation -> {
+                var rows=input.prepare(config,preparation.report);var spec=CaseSuite.load(input.file);Instant started=Instant.now();
+                var tasks=rows.stream().map(p -> {Set<String> locks=new HashSet<>(p.row().resources());String ref=config.auth().mode().equals("jwt")?config.persona(p.persona()).usernameRef():config.persona(p.persona()).storageStateRef();String identity=Objects.toString(System.getenv(ref),ref);if(config.auth().mode().equals("jwt")) identity=identity.toLowerCase(Locale.ROOT);else if(System.getenv(ref)!=null) try {identity=Path.of(identity).toRealPath().toString();}catch(java.io.IOException ignored) {}locks.add("identity:"+Json.hash(config.org().baseUrl()+"|"+identity));return new DatasetScheduler.Task<>(p.row().id(),p.row().after(),locks,p);}).toList();
+                DatasetScheduler.validate(tasks);
+                preparation.ready();
+                Path root=preparation.root;List<Map<String,Object>> completed=new ArrayList<>();int exit=0;
+                if(input.impact!=null) Json.write(root.resolve("impact-plan.json"),input.impact);
+                var results=DatasetScheduler.run(tasks,config.execution().workers(),failFast,p -> executeRow(config,root,p),code -> code==0,hu.ak91.sf.e2e.engine.PlaywrightEngine::closeWorkerRuntime);
+                int resultIndex=0;
+                for(var prepared:rows) {
+                    var row=prepared.row();Path child=SafePaths.inside(root,"cases/"+row.id());
+                    var execution=results.get(resultIndex++);
+                    if(execution.status().equals("SKIPPED")) placeholder(root,child,prepared,"SKIPPED","NOT_RUN_DEPENDENCY_OR_FAIL_FAST");
+                    else if(execution.error()!=null) { String code=execution.error() instanceof Failure f?f.code():"ENGINE_FAILURE";if(!Files.isRegularFile(child.resolve("case-report.json"))) placeholder(root,child,prepared,"BLOCKED",code);exit=Math.max(exit,code.equals("CANCELLED")?130:2); }
+                    else exit=Math.max(exit,execution.value());
+                    var state=Json.read(child.resolve("case-report.json"),Map.class);
+                    if(!"PASSED".equals(state.get("status"))) exit=Math.max(exit,1);
+                    completed.add(Map.of("datasetId",row.id(),"caseId",prepared.recipe().id(),"directory","cases/"+row.id(),"status",state.get("status"),"checksum",Json.hash(state),"tags",row.tags(),"inputHash",inputHash(prepared,config)));
+                }
+                Map<String,Object> suite=new LinkedHashMap<>();suite.put("schemaVersion",1);suite.put("suiteId",spec.id());suite.put("runId",root.getFileName().toString());
+                suite.put("startedAt",started);suite.put("completedAt",Instant.now());suite.put("selected",rows.size());suite.put("complete",true);suite.put("status",exit==0?"PASSED":"FAILED");
+                suite.put("exitCode",exit);suite.put("modelCalls",0);suite.put("datasets",completed);
+                suite.put("suiteSourceHash",SuiteSelection.sourceHash(spec));if(input.shard!=null) suite.put("shard",input.shard);
+                if(input.lastFailed!=null) suite.put("selectionSource","last-failed");
+                suite.put("trendContext",Json.hash(Map.of("workers",config.execution().workers(),"rows",rows.stream().map(p -> Map.of("row",p.row(),"recipe",Json.hash(p.recipe()),"parametersHash",Json.hash(p.params()),"namespace",Json.hash(LocatorStore.namespace(config,p.persona())))).toList())));
+                SuiteReportExporter.write(root,suite);
+                System.out.println("Suite "+spec.id()+": "+suite.get("status")+"; datasets="+rows.size()+"; model calls=0");System.out.println("Allure report: "+root.resolve("index.html"));return exit;
+            });
         }
         private int executeRow(FrameworkConfig config,Path root,Prepared prepared) {
                 Path child=SafePaths.inside(root,"cases/"+prepared.row().id());int exit=0;

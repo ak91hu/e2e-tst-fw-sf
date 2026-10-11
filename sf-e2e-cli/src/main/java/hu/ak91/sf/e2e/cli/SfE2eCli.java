@@ -76,10 +76,14 @@ public final class SfE2eCli implements Runnable {
     public static final class Run implements Callable<Integer> {
         @Mixin Options options;
         public Integer call() {
-            var config=options.config("deterministic");var report=RunCoordinator.run(config,options.plan(config));
-            System.out.println("Run "+report.runId()+": "+report.counts()+"; exit "+report.exitCode());
-            System.out.println("Report: "+Path.of(config.report().root(),report.runId(),"index.html").toAbsolutePath());
-            return report.exitCode();
+            var config=options.config("deterministic");
+            return PreparedRun.execute(config,"JUnit run",preparation -> {
+                var plan=options.plan(config);preparation.ready();
+                var report=RunCoordinator.run(config,plan,preparation.root);
+                System.out.println("Run "+report.runId()+": "+report.counts()+"; exit "+report.exitCode());
+                System.out.println("Report: "+Path.of(config.report().root(),report.runId(),"index.html").toAbsolutePath());
+                return report.exitCode();
+            });
         }
     }
     @Command(name="doctor",mixinStandardHelpOptions=true,description="Validate runtime/configuration and required live secret references.")

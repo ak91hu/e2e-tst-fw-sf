@@ -11,7 +11,11 @@ public final class WorkflowReportExporter {
     public static void write(Path root,Map<String,Object> state,List<Map<String,Object>> events) {
         write(root,state,events,true);
     }
+    public static void writeDesign(Path root,Map<String,Object> state,List<Map<String,Object>> events) {
+        TestDesignReport.write(root,state,events);
+    }
     public static void write(Path root,Map<String,Object> state,List<Map<String,Object>> events,boolean render) {
+        HtmlSummary.workflow(root,state,events);
         Map<String,Object> report=new LinkedHashMap<>(state);report.put("events",events);report.put("reportEngine","Allure");report.put("allureVersion",AllureReports.VERSION);
         var design=TestDesignReport.write(root,state,events);
         if(!design.isEmpty()) report.put("testDesign",design);
@@ -37,7 +41,7 @@ public final class WorkflowReportExporter {
         result.put("parameters",List.of(Map.of("name","persona","value",state.getOrDefault("persona","default")),
             Map.of("name","modelCalls","value",Objects.toString(state.getOrDefault("modelCalls",0)),"excluded",true)));
         Json.write(results.resolve(SafePaths.segment(attempt)+"-result.json"),result);
-        if(render) AllureReports.generate(root);
+        if(render) HtmlSummary.render(root);
     }
     public static void rebuild(Path root) {
         var state=Json.read(root.resolve("case-report.json"),Map.class);
@@ -49,6 +53,7 @@ public final class WorkflowReportExporter {
         verifyEvidence(root);AllureReports.verify(root);
     }
     public static void verifyEvidence(Path root) {
+        PreflightReport.verify(root);HtmlSummary.verify(root);
         var state=Json.read(root.resolve("case-report.json"),Map.class);
         if(state.containsKey("testDesign")) {
             Failure.require(state.get("testDesign") instanceof Map<?,?>,"REPORT_RUN_MISMATCH","Invalid test design receipt");
