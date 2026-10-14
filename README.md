@@ -1,3 +1,5 @@
+[![SF E2E logo: cloud automation path ending in a checkmark](assets/sf-e2e-logo.png)](assets/sf-e2e-logo.png)
+
 # General Salesforce UI Mapping & Self-Healing Framework
 
 ![Java 27 build](https://img.shields.io/badge/Java_build-27-007396)
